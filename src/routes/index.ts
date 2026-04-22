@@ -1,0 +1,30 @@
+import { Router } from "express";
+import { authRouter } from "./auth.routes";
+import { usersRouter } from "./users.routes";
+import { clientsRouter } from "./clients.routes";
+import { providersRouter } from "./providers.routes";
+import { requestsRouter } from "./requests.routes";
+import { quotationsRouter } from "./quotations.routes";
+import { paymentsRouter } from "./payments.routes";
+import { vouchersRouter } from "./vouchers.routes";
+import { activityLogsRouter } from "./activity-logs.routes";
+import { systemConfigRouter } from "./system-config.routes";
+import { emailTemplatesRouter } from "./email-templates.routes";
+import { reportsRouter } from "./reports.routes";
+import { authMiddleware } from "../middlewares/auth.middleware";
+
+export const apiRouter = Router();
+
+apiRouter.use("/auth", authRouter);
+apiRouter.use(authMiddleware);
+apiRouter.use("/users", usersRouter);
+apiRouter.use("/clients", clientsRouter);
+apiRouter.use("/providers", providersRouter);
+apiRouter.use("/requests", requestsRouter);
+apiRouter.use("/quotations", quotationsRouter);
+apiRouter.use("/payments", paymentsRouter);
+apiRouter.use("/vouchers", vouchersRouter);
+apiRouter.use("/activity-logs", activityLogsRouter);
+apiRouter.use("/system-config", systemConfigRouter);
+apiRouter.use("/email-templates", emailTemplatesRouter);
+apiRouter.use("/reports", reportsRouter);

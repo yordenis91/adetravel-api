@@ -1,0 +1,27 @@
+# Node modules
+node_modules/
+
+# Build outputs
+/dist/
+
+# Environment files
+.env
+.env.*
+
+# Prisma generated client
+/generated/prisma
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor directories and system files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Test output
+coverage/
+

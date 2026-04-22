@@ -1,0 +1,318 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ──────────────────────────────────────────
+
+enum UserRole {
+  ADMINISTRADOR
+  USUARIO
+}
+
+enum AgencyRole {
+  GERENTE
+  AGENTE_SENIOR
+  AGENTE
+  ASISTENTE
+}
+
+enum RequestStatus {
+  RECEPCIONADA
+  COTIZADA
+  CONFIRMADA
+  CANCELADA
+  VENDIDA
+}
+
+enum QuotationStatus {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TARJETA
+  TRANSFERENCIA
+  CHEQUE
+  WEBPAY
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  COMPLETADO
+  CANCELADO
+}
+
+enum VoucherStatus {
+  BORRADOR
+  EMITIDO
+  CANCELADO
+}
+
+// ─── MODELS ─────────────────────────────────────────
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  fullName     String
+  passwordHash String
+  role         UserRole    @default(USUARIO)
+  agencyRole   AgencyRole?
+  department   String?
+  phone        String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("users")
+}
+
+model Client {
+  id                   String   @id @default(uuid())
+  firstName            String
+  lastName             String
+  email                String?
+  phone                String?
+  rut                  String?
+  passportNumber       String?
+  passportExpiry       String?
+  passportIssueDate    String?
+  passportCountry      String?
+  birthDate            String?
+  nationality          String?
+  address              String?
+  frequentFlyerNumbers String[]
+  restrictions         String?
+  referralSource       String?
+  bankAccount          String?
+  bankName             String?
+  bankAccountHolder    String?
+  bankEmail            String?
+  isActive             Boolean  @default(true)
+  createdBy            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  requests   Request[]
+  quotations Quotation[]
+  payments   Payment[]
+  vouchers   Voucher[]
+
+  @@map("clients")
+}
+
+model Provider {
+  id                String   @id @default(uuid())
+  name              String
+  fantasyName       String?
+  rut               String?
+  country           String?
+  city              String?
+  address           String?
+  phone             String?
+  email             String?
+  businessType      String?
+  executiveName     String?
+  executivePhone    String?
+  executiveEmail    String?
+  contactName       String?
+  contactPhone      String?
+  contactEmail      String?
+  contactRut        String?
+  bankAccount       String?
+  bankName          String?
+  bankAccountHolder String?
+  paymentMethod     String?
+  vatPercentage     Float?
+  isActive          Boolean  @default(true)
+  createdBy         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  vouchers Voucher[]
+
+  @@map("providers")
+}
+
+model Request {
+  id                 String        @id @default(uuid())
+  requestNumber      String        @unique
+  clientId           String
+  isPackage          Boolean       @default(false)
+  requestDate        String?
+  originCountry      String?
+  originCity         String?
+  destinationCountry String?
+  destinationCity    String?
+  durationDays       Int?
+  budgetMin          Float?
+  budgetMax          Float?
+  status             RequestStatus @default(RECEPCIONADA)
+  description        String?
+  services           String[]
+  createdBy          String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  client     Client      @relation(fields: [clientId], references: [id])
+  quotations Quotation[]
+  payments   Payment[]
+  vouchers   Voucher[]
+
+  @@map("requests")
+}
+
+model Quotation {
+  id                 String          @id @default(uuid())
+  quotationNumber    String          @unique
+  requestId          String
+  clientId           String
+  validUntil         String?
+  status             QuotationStatus @default(BORRADOR)
+  currency           String          @default("CLP")
+  items              Json[]          // Array de objetos: { service, description, quantity, unitPrice, total }
+  subtotal           Float?
+  taxPercentage      Float?          @default(19)
+  taxAmount          Float?
+  discount           Float?
+  total              Float?
+  notes              String?
+  termsAndConditions String?
+  createdBy          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  request  Request   @relation(fields: [requestId], references: [id])
+  client   Client    @relation(fields: [clientId], references: [id])
+  payments Payment[]
+
+  @@map("quotations")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  paymentNumber String        @unique
+  requestId     String
+  quotationId   String?
+  clientId      String
+  amount        Float
+  currency      String        @default("CLP")
+  paymentDate   String?
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDIENTE)
+  reference     String?
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  request   Request    @relation(fields: [requestId], references: [id])
+  quotation Quotation? @relation(fields: [quotationId], references: [id])
+  client    Client     @relation(fields: [clientId], references: [id])
+
+  @@map("payments")
+}
+
+model Voucher {
+  id               String        @id @default(uuid())
+  voucherNumber    String        @unique
+  requestId        String
+  clientId         String
+  providerId       String?
+  serviceType      String?
+  serviceName      String?
+  serviceDetails   String?
+  checkIn          String?
+  checkOut         String?
+  destination      String?
+  passengerNames   String[]
+  confirmationCode String?
+  status           VoucherStatus @default(BORRADOR)
+  notes            String?
+  amount           Float?
+  currency         String?
+  createdBy        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  request  Request   @relation(fields: [requestId], references: [id])
+  client   Client    @relation(fields: [clientId], references: [id])
+  provider Provider? @relation(fields: [providerId], references: [id])
+
+  @@map("vouchers")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  action      String
+  entityType  String
+  entityId    String
+  entityLabel String?
+  description String?
+  performedBy String?
+  metadata    String?  // JSON serializado
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("activity_logs")
+}
+
+model SystemConfig {
+  id                           String   @id @default(uuid())
+  agencyName                   String?
+  agencyFantasyName            String?
+  agencyRut                    String?
+  agencyAddress                String?
+  agencyPhone                  String?
+  agencyEmail                  String?
+  agencyWebsite                String?
+  agencyLogoUrl                String?
+  smtpHost                     String?
+  smtpPort                     Int?
+  smtpUser                     String?
+  smtpPassword                 String?
+  smtpFromName                 String?
+  smtpFromEmail                String?
+  smtpEncryption               String?
+  notifyOnQuotationSent        Boolean  @default(false)
+  notifyOnPaymentCompleted     Boolean  @default(false)
+  notifyOnVoucherIssued        Boolean  @default(false)
+  notifyOnRequestCreated       Boolean  @default(false)
+  defaultCurrency              String?  @default("CLP")
+  defaultTaxPercentage         Float?   @default(19)
+  defaultQuotationValidityDays Int?     @default(15)
+  defaultTermsAndConditions    String?
+  defaultQuotationNotes        String?
+  requestNumberPrefix          String?  @default("ADET")
+  quotationNumberPrefix        String?  @default("COTIZ")
+  paymentNumberPrefix          String?  @default("PAG")
+  voucherNumberPrefix          String?  @default("VCH")
+  timezone                     String?  @default("America/Santiago")
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // QUOTATION_SENT | PAYMENT_CONFIRMED | VOUCHER_ISSUED | REQUEST_CREATED | CUSTOM
+  subject     String
+  bodyHtml    String
+  isActive    Boolean  @default(true)
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("email_templates")
+}
