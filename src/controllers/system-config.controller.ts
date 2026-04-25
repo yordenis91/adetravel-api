@@ -11,8 +11,8 @@ export async function getSystemConfig(_req: Request, res: Response): Promise<voi
 export async function upsertSystemConfig(req: Request, res: Response): Promise<void> {
   const existing = await prisma.systemConfig.findFirst();
   const config = existing
-    ? await prisma.systemConfig.update({ where: { id: existing.id }, data: req.body as object })
-    : await prisma.systemConfig.create({ data: req.body as object });
+    ? await prisma.systemConfig.update({ where: { id: existing.id }, data: req.body as any })
+    : await prisma.systemConfig.create({ data: req.body as any });
 
   await createActivityLog({
     action: existing ? "UPDATE" : "CREATE",

@@ -20,27 +20,27 @@ export async function listEmailTemplates(req: Request, res: Response): Promise<v
 }
 
 export async function getEmailTemplate(req: Request, res: Response): Promise<void> {
-  const item = await prisma.emailTemplate.findUnique({ where: { id: req.params.id } });
+  const item = await prisma.emailTemplate.findUnique({ where: { id: String(req.params.id) } });
   if (!item) throw new ApiError("Plantilla no encontrada", 404, "EMAIL_TEMPLATE_NOT_FOUND");
   sendItem(res, item);
 }
 
 export async function createEmailTemplate(req: Request, res: Response): Promise<void> {
   const item = await prisma.emailTemplate.create({
-    data: { ...(req.body as object), createdBy: req.user?.id }
+    data: { ...(req.body as any), createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "EmailTemplate", entityId: item.id, entityLabel: item.name, performedBy: req.user?.id });
   sendItem(res, item, 201);
 }
 
 export async function updateEmailTemplate(req: Request, res: Response): Promise<void> {
-  const item = await prisma.emailTemplate.update({ where: { id: req.params.id }, data: req.body as object });
+  const item = await prisma.emailTemplate.update({ where: { id: String(req.params.id) }, data: req.body as any });
   await createActivityLog({ action: "UPDATE", entityType: "EmailTemplate", entityId: item.id, entityLabel: item.name, performedBy: req.user?.id });
   sendItem(res, item);
 }
 
 export async function deleteEmailTemplate(req: Request, res: Response): Promise<void> {
-  const item = await prisma.emailTemplate.delete({ where: { id: req.params.id } });
+  const item = await prisma.emailTemplate.delete({ where: { id: String(req.params.id) } });
   await createActivityLog({ action: "DELETE", entityType: "EmailTemplate", entityId: item.id, entityLabel: item.name, performedBy: req.user?.id });
   sendItem(res, { ok: true });
 }

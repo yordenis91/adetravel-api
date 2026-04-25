@@ -33,27 +33,30 @@ export async function listProviders(req: Request, res: Response): Promise<void> 
 }
 
 export async function getProvider(req: Request, res: Response): Promise<void> {
-  const item = await prisma.provider.findUnique({ where: { id: req.params.id } });
+  const providerId = String(String(req.params.id));
+  const item = await prisma.provider.findUnique({ where: { id: providerId } });
   if (!item) throw new ApiError("Proveedor no encontrado", 404, "PROVIDER_NOT_FOUND");
   sendItem(res, item);
 }
 
 export async function createProvider(req: Request, res: Response): Promise<void> {
   const item = await prisma.provider.create({
-    data: { ...(req.body as object), createdBy: req.user?.id }
+    data: { ...(req.body as any), createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "Provider", entityId: item.id, entityLabel: item.name, performedBy: req.user?.id });
   sendItem(res, item, 201);
 }
 
 export async function updateProvider(req: Request, res: Response): Promise<void> {
-  const item = await prisma.provider.update({ where: { id: req.params.id }, data: req.body as object });
+  const providerId = String(String(req.params.id));
+  const item = await prisma.provider.update({ where: { id: providerId }, data: req.body as any });
   await createActivityLog({ action: "UPDATE", entityType: "Provider", entityId: item.id, entityLabel: item.name, performedBy: req.user?.id });
   sendItem(res, item);
 }
 
 export async function deleteProvider(req: Request, res: Response): Promise<void> {
-  const item = await prisma.provider.delete({ where: { id: req.params.id } });
+  const providerId = String(String(req.params.id));
+  const item = await prisma.provider.delete({ where: { id: providerId } });
   await createActivityLog({ action: "DELETE", entityType: "Provider", entityId: item.id, entityLabel: item.name, performedBy: req.user?.id });
   sendItem(res, { ok: true });
 }

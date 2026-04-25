@@ -23,7 +23,7 @@ export async function listVouchers(req: Request, res: Response): Promise<void> {
 
 export async function getVoucher(req: Request, res: Response): Promise<void> {
   const item = await prisma.voucher.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
     include: { client: true, provider: true }
   });
   if (!item) throw new ApiError("Voucher no encontrado", 404, "VOUCHER_NOT_FOUND");
@@ -34,7 +34,7 @@ export async function createVoucher(req: Request, res: Response): Promise<void> 
   const config = await prisma.systemConfig.findFirst();
   const voucherNumber = await generateNumber("Voucher", config?.voucherNumberPrefix ?? "VCH");
   const item = await prisma.voucher.create({
-    data: { ...(req.body as object), voucherNumber, createdBy: req.user?.id }
+    data: { ...(req.body as any), voucherNumber, createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "Voucher", entityId: item.id, entityLabel: item.voucherNumber, performedBy: req.user?.id });
   sendItem(res, item, 201);
@@ -42,8 +42,8 @@ export async function createVoucher(req: Request, res: Response): Promise<void> 
 
 export async function updateVoucher(req: Request, res: Response): Promise<void> {
   const item = await prisma.voucher.update({
-    where: { id: req.params.id },
-    data: req.body as object,
+    where: { id: String(req.params.id) },
+    data: req.body as any,
     include: { client: true }
   });
   if (item.status === "EMITIDO" && item.client.email) {
@@ -59,7 +59,7 @@ export async function updateVoucher(req: Request, res: Response): Promise<void> 
 }
 
 export async function deleteVoucher(req: Request, res: Response): Promise<void> {
-  const item = await prisma.voucher.delete({ where: { id: req.params.id } });
+  const item = await prisma.voucher.delete({ where: { id: String(req.params.id) } });
   await createActivityLog({ action: "DELETE", entityType: "Voucher", entityId: item.id, entityLabel: item.voucherNumber, performedBy: req.user?.id });
   sendItem(res, { ok: true });
 }

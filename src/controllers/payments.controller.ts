@@ -22,7 +22,7 @@ export async function listPayments(req: Request, res: Response): Promise<void> {
 }
 
 export async function getPayment(req: Request, res: Response): Promise<void> {
-  const item = await prisma.payment.findUnique({ where: { id: req.params.id } });
+  const item = await prisma.payment.findUnique({ where: { id: String(req.params.id) } });
   if (!item) throw new ApiError("Pago no encontrado", 404, "PAYMENT_NOT_FOUND");
   sendItem(res, item);
 }
@@ -31,7 +31,7 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
   const config = await prisma.systemConfig.findFirst();
   const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix ?? "PAG");
   const item = await prisma.payment.create({
-    data: { ...(req.body as object), paymentNumber, createdBy: req.user?.id }
+    data: { ...(req.body as any), paymentNumber, createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "Payment", entityId: item.id, entityLabel: item.paymentNumber, performedBy: req.user?.id });
   sendItem(res, item, 201);
@@ -39,8 +39,8 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
 
 export async function updatePayment(req: Request, res: Response): Promise<void> {
   const item = await prisma.payment.update({
-    where: { id: req.params.id },
-    data: req.body as object,
+    where: { id: String(req.params.id) },
+    data: req.body as any,
     include: { client: true }
   });
   if (item.status === "COMPLETADO" && item.client.email) {
@@ -56,7 +56,7 @@ export async function updatePayment(req: Request, res: Response): Promise<void> 
 }
 
 export async function deletePayment(req: Request, res: Response): Promise<void> {
-  const item = await prisma.payment.delete({ where: { id: req.params.id } });
+  const item = await prisma.payment.delete({ where: { id: String(req.params.id) } });
   await createActivityLog({ action: "DELETE", entityType: "Payment", entityId: item.id, entityLabel: item.paymentNumber, performedBy: req.user?.id });
   sendItem(res, { ok: true });
 }

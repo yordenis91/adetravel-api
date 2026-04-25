@@ -6,7 +6,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().default("1d"),
-  FRONTEND_URL: z.string().url(),
+  FRONTEND_URL: z.string().url().default("http://localhost:8080"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),

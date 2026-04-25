@@ -20,7 +20,10 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
    - `npm run prisma:generate`
 4. Ejecutar migraciones:
    - `npm run prisma:migrate`
-5. Ejecutar en desarrollo:
+5. Crear usuario administrador inicial:
+   - `npm run seed:admin`
+   - El seed usa las variables `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_FULL_NAME`, `ADMIN_AGENCY_ROLE` si están definidas.
+6. Ejecutar en desarrollo:
    - `npm run dev`
 
 ## Endpoints base

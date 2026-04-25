@@ -42,7 +42,7 @@ export const quotationsQuerySchema = paginationQuerySchema.extend({
 export const quotationCreateSchema = z.object({
   requestId: z.string().uuid(),
   clientId: z.string().uuid(),
-  items: z.array(z.record(z.unknown())).default([])
+  items: z.array(z.record(z.string(), z.unknown())).default([])
 }).passthrough();
 export const quotationUpdateSchema = quotationCreateSchema.partial().extend({
   status: z.nativeEnum(QuotationStatus).optional()

@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { AgencyRole, UserRole } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
 import { ApiError } from "../utils/api-error";
@@ -26,15 +27,23 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
 }
 
 export async function getUser(req: Request, res: Response): Promise<void> {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  const userId = String(String(req.params.id));
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new ApiError("Usuario no encontrado", 404, "USER_NOT_FOUND");
   sendItem(res, user);
 }
 
 export async function updateUser(req: Request, res: Response): Promise<void> {
+  const userId = String(String(req.params.id));
+  const updateData = req.body as {
+    role?: UserRole;
+    agencyRole?: AgencyRole | null;
+    isActive?: boolean;
+  };
+
   const user = await prisma.user.update({
-    where: { id: req.params.id },
-    data: req.body as { role?: "ADMINISTRADOR" | "USUARIO"; agencyRole?: string | null; isActive?: boolean }
+    where: { id: userId },
+    data: updateData
   });
   await createActivityLog({
     action: "UPDATE",
@@ -47,7 +56,8 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
 }
 
 export async function deleteUser(req: Request, res: Response): Promise<void> {
-  const user = await prisma.user.delete({ where: { id: req.params.id } });
+  const userId = String(String(req.params.id));
+  const user = await prisma.user.delete({ where: { id: userId } });
   await createActivityLog({
     action: "DELETE",
     entityType: "User",

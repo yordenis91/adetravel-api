@@ -2,7 +2,6 @@ import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
-import { sendError } from "../utils/response";
 
 const tokenBlacklist = new Set<string>();
 
@@ -21,33 +20,78 @@ export async function authMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    sendError(res, "Token no proporcionado", "UNAUTHORIZED", 401);
-    return;
-  }
-
-  const token = authHeader.replace("Bearer ", "");
-  if (tokenBlacklist.has(token)) {
-    sendError(res, "Token invalidado", "UNAUTHORIZED", 401);
-    return;
-  }
-
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as AuthTokenPayload;
-    const user = await prisma.user.findUnique({
-      where: { id: payload.id },
-      select: { id: true, email: true, role: true, isActive: true }
-    });
-
-    if (!user || !user.isActive) {
-      sendError(res, "Usuario no autorizado", "UNAUTHORIZED", 401);
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({
+        error: "Token de autenticación no proporcionado",
+        code: "NO_TOKEN"
+      });
       return;
     }
 
-    req.user = { id: user.id, email: user.email, role: user.role };
+    const token = authHeader.split(" ")[1];
+    if (tokenBlacklist.has(token)) {
+      res.status(401).json({
+        error: "Token invalidado",
+        code: "TOKEN_INVALIDATED"
+      });
+      return;
+    }
+
+    let decoded: AuthTokenPayload;
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET as string) as AuthTokenPayload;
+    } catch (err) {
+      if (err instanceof jwt.TokenExpiredError) {
+        res.status(401).json({
+          error: "La sesión ha expirado. Por favor inicie sesión nuevamente.",
+          code: "TOKEN_EXPIRED"
+        });
+        return;
+      }
+      res.status(401).json({
+        error: "Token inválido",
+        code: "INVALID_TOKEN"
+      });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        agencyRole: true,
+        isActive: true
+      }
+    });
+
+    if (!user) {
+      res.status(401).json({
+        error: "Usuario no encontrado",
+        code: "USER_NOT_FOUND"
+      });
+      return;
+    }
+
+    if (!user.isActive) {
+      res.status(403).json({
+        error: "Tu cuenta ha sido desactivada. Contacta al administrador.",
+        code: "USER_INACTIVE"
+      });
+      return;
+    }
+
+    req.user = user;
     next();
-  } catch {
-    sendError(res, "Token inválido", "UNAUTHORIZED", 401);
+  } catch (error) {
+    console.error("Error en authMiddleware:", error);
+    res.status(500).json({
+      error: "Error interno del servidor",
+      code: "INTERNAL_ERROR"
+    });
   }
 }

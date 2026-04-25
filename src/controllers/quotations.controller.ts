@@ -26,7 +26,7 @@ export async function listQuotations(req: Request, res: Response): Promise<void>
 
 export async function getQuotation(req: Request, res: Response): Promise<void> {
   const item = await prisma.quotation.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
     include: { request: true, client: true }
   });
   if (!item) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
@@ -37,14 +37,14 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   const config = await prisma.systemConfig.findFirst();
   const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix ?? "COTIZ");
   const item = await prisma.quotation.create({
-    data: { ...(req.body as object), quotationNumber, createdBy: req.user?.id }
+    data: { ...(req.body as any), quotationNumber, createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "Quotation", entityId: item.id, entityLabel: item.quotationNumber, performedBy: req.user?.id });
   sendItem(res, item, 201);
 }
 
 export async function updateQuotation(req: Request, res: Response): Promise<void> {
-  const item = await prisma.quotation.update({ where: { id: req.params.id }, data: req.body as object, include: { client: true } });
+  const item = await prisma.quotation.update({ where: { id: String(req.params.id) }, data: req.body as any, include: { client: true } });
   if (item.status === "ENVIADA" && item.client.email) {
     await sendTemplateEmail({
       type: "QUOTATION_SENT",
@@ -58,7 +58,7 @@ export async function updateQuotation(req: Request, res: Response): Promise<void
 }
 
 export async function deleteQuotation(req: Request, res: Response): Promise<void> {
-  const item = await prisma.quotation.delete({ where: { id: req.params.id } });
+  const item = await prisma.quotation.delete({ where: { id: String(req.params.id) } });
   await createActivityLog({ action: "DELETE", entityType: "Quotation", entityId: item.id, entityLabel: item.quotationNumber, performedBy: req.user?.id });
   sendItem(res, { ok: true });
 }
