@@ -13,7 +13,13 @@ export function validate(
       return;
     }
 
-    req[source] = result.data;
+    // CORRECCIÓN: Evita el error 'only a getter' mutando el objeto original para query y params
+    if (source === "body") {
+      req.body = result.data;
+    } else {
+      Object.assign(req[source], result.data);
+    }
+    
     next();
   };
 }

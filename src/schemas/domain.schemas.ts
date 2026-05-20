@@ -26,7 +26,10 @@ export const providerCreateSchema = z.object({ name: z.string().min(2) }).passth
 export const providerUpdateSchema = providerCreateSchema.partial();
 
 export const requestsQuerySchema = paginationQuerySchema.extend({
-  status: z.nativeEnum(RequestStatus).optional(),
+  status: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    z.nativeEnum(RequestStatus)
+  ).optional(),
   clientId: z.string().uuid().optional(),
   search: z.string().optional()
 });
@@ -34,7 +37,10 @@ export const requestCreateSchema = z.object({ clientId: z.string().uuid() }).pas
 export const requestUpdateSchema = requestCreateSchema.partial();
 
 export const quotationsQuerySchema = paginationQuerySchema.extend({
-  status: z.nativeEnum(QuotationStatus).optional(),
+  status: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    z.nativeEnum(QuotationStatus)
+  ).optional(),
   clientId: z.string().uuid().optional(),
   requestId: z.string().uuid().optional(),
   search: z.string().optional()
@@ -49,7 +55,10 @@ export const quotationUpdateSchema = quotationCreateSchema.partial().extend({
 });
 
 export const paymentsQuerySchema = paginationQuerySchema.extend({
-  status: z.nativeEnum(PaymentStatus).optional(),
+  status: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    z.nativeEnum(PaymentStatus)
+  ).optional(),
   clientId: z.string().uuid().optional(),
   requestId: z.string().uuid().optional()
 });
@@ -64,7 +73,10 @@ export const paymentUpdateSchema = paymentCreateSchema.partial().extend({
 });
 
 export const vouchersQuerySchema = paginationQuerySchema.extend({
-  status: z.nativeEnum(VoucherStatus).optional(),
+  status: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    z.nativeEnum(VoucherStatus)
+  ).optional(),
   clientId: z.string().uuid().optional(),
   requestId: z.string().uuid().optional()
 });
