@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { 
   createQuotation, deleteQuotation, getQuotation, listQuotations, 
-  updateQuotation, changeQuotationStatus, previewQuotation 
+  updateQuotation, changeQuotationStatus, previewQuotation, duplicateQuotation 
 } from "../controllers/quotations.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
@@ -18,6 +18,7 @@ quotationsRouter.get("/:id", validate(idSchema, "params"), asyncHandler(getQuota
 quotationsRouter.get("/:id/preview", validate(idSchema, "params"), asyncHandler(previewQuotation));
 
 quotationsRouter.post("/", validate(createQuotationSchema), asyncHandler(createQuotation));
+quotationsRouter.post("/:id/duplicate", validate(idSchema, "params"), asyncHandler(duplicateQuotation));
 quotationsRouter.patch("/:id", validate(idSchema, "params"), validate(updateQuotationSchema), asyncHandler(updateQuotation));
 
 // Endpoint dedicado al flujo de estados
