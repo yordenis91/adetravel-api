@@ -8,7 +8,8 @@ import { generateNumber } from "../services/numbering.service";
 
 export async function listRequests(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
-  const status = req.query.status as string | undefined;
+  const statusRaw = req.query.status as string | undefined;
+  const status = statusRaw ? statusRaw.toUpperCase() : undefined;
   const clientId = req.query.clientId as string | undefined;
   const search = req.query.search as string | undefined;
 
