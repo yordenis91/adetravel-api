@@ -57,15 +57,21 @@ export async function createRequest(req: Request, res: Response): Promise<void> 
   const config = await prisma.systemConfig.findFirst();
   const prefix = config?.requestNumberPrefix ?? "ADET";
   const requestNumber = await generateNumber("Request", prefix);
+  const payload = { ...(req.body as any) };
+  if (payload.status) payload.status = String(payload.status).toUpperCase();
+
   const item = await prisma.request.create({
-    data: { ...(req.body as any), requestNumber, createdBy: req.user!.id }
+    data: { ...payload, requestNumber, createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "Request", entityId: item.id, entityLabel: item.requestNumber, performedBy: req.user?.id });
   sendItem(res, item, 201);
 }
 
 export async function updateRequest(req: Request, res: Response): Promise<void> {
-  const item = await prisma.request.update({ where: { id: String(req.params.id) }, data: req.body as any });
+  const payload = { ...(req.body as any) };
+  if (payload.status) payload.status = String(payload.status).toUpperCase();
+
+  const item = await prisma.request.update({ where: { id: String(req.params.id) }, data: payload });
   await createActivityLog({ action: "UPDATE", entityType: "Request", entityId: item.id, entityLabel: item.requestNumber, performedBy: req.user?.id });
   sendItem(res, item);
 }
