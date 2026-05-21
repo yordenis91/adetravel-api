@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { 
   createQuotation, deleteQuotation, getQuotation, listQuotations, 
-  updateQuotation, changeQuotationStatus, downloadQuotationPdf 
+  updateQuotation, changeQuotationStatus, previewQuotation 
 } from "../controllers/quotations.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
@@ -14,8 +14,8 @@ export const quotationsRouter = Router();
 quotationsRouter.get("/", validate(quotationsQuerySchema, "query"), asyncHandler(listQuotations));
 quotationsRouter.get("/:id", validate(idSchema, "params"), asyncHandler(getQuotation));
 
-// Endpoint de descarga de PDF
-quotationsRouter.get("/:id/pdf", validate(idSchema, "params"), asyncHandler(downloadQuotationPdf));
+// 🌟 AQUÍ ESTÁ EL CAMBIO: Cambiamos /pdf por /preview
+quotationsRouter.get("/:id/preview", validate(idSchema, "params"), asyncHandler(previewQuotation));
 
 quotationsRouter.post("/", validate(createQuotationSchema), asyncHandler(createQuotation));
 quotationsRouter.patch("/:id", validate(idSchema, "params"), validate(updateQuotationSchema), asyncHandler(updateQuotation));
