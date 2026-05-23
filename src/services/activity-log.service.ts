@@ -11,6 +11,7 @@ interface ActivityLogInput {
 }
 
 export async function createActivityLog(input: ActivityLogInput): Promise<void> {
+ try {
   await prisma.activityLog.create({
     data: {
       action: input.action,
@@ -22,4 +23,12 @@ export async function createActivityLog(input: ActivityLogInput): Promise<void> 
       metadata: input.metadata ? JSON.stringify(input.metadata) : undefined
     }
   });
+} catch (error) {
+    // 🔥 Falla silenciosa: El logger nunca debe revertir la operación principal
+    console.error("[ActivityLogger] Error registrando actividad:", {
+      action: input.action,
+      entityId: input.entityId,
+      error: (error as Error).message
+    });
+  }
 }
