@@ -93,7 +93,9 @@ export const activityLogQuerySchema = paginationQuerySchema.extend({
   entityId: z.string().optional()
 });
 
-export const systemConfigUpsertSchema = z.object({}).passthrough();
+export const systemConfigUpsertSchema = z.object({
+  exchangeRates: z.string().optional().nullable(),
+}).passthrough();
 
 export const emailTemplatesQuerySchema = paginationQuerySchema.extend({
   type: z.string().optional(),

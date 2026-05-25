@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma";
 
 interface ActivityLogInput {
-  action: "CREATE" | "UPDATE" | "DELETE";
+  action: "CREATE" | "UPDATE" | "DELETE" | "SYNC_API";
   entityType: string;
   entityId: string;
   entityLabel?: string;

@@ -98,6 +98,7 @@ model Client {
   bankEmail            String?
   isActive             Boolean  @default(true)
   createdBy            String?
+  lastBirthdayEmailYear Int?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -296,8 +297,10 @@ model SystemConfig {
   paymentNumberPrefix          String?  @default("PAG")
   voucherNumberPrefix          String?  @default("VCH")
   timezone                     String?  @default("America/Santiago")
+  exchangeRates                String?  @db.Text
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
+  
 
   @@map("system_config")
 }
