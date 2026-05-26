@@ -7,21 +7,18 @@ import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { idSchema, quotationsQuerySchema } from "../schemas/domain.schemas";
 import { createQuotationSchema, updateQuotationSchema, changeStatusSchema } from "../validators/quotations.validator";
-import { roleMiddleware } from "../middlewares/role.middleware";
+import { requirePermission } from "../middlewares/permission.middleware";
 
 export const quotationsRouter = Router();
 
-quotationsRouter.get("/", validate(quotationsQuerySchema, "query"), asyncHandler(listQuotations));
-quotationsRouter.get("/:id", validate(idSchema, "params"), asyncHandler(getQuotation));
+quotationsRouter.get("/", requirePermission("VIEW_QUOTATIONS"), validate(quotationsQuerySchema, "query"), asyncHandler(listQuotations));
+quotationsRouter.get("/:id", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(getQuotation));
+quotationsRouter.get("/:id/preview", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(previewQuotation));
 
-// 🌟 AQUÍ ESTÁ EL CAMBIO: Cambiamos /pdf por /preview
-quotationsRouter.get("/:id/preview", validate(idSchema, "params"), asyncHandler(previewQuotation));
+quotationsRouter.post("/", requirePermission("MANAGE_QUOTATIONS"), validate(createQuotationSchema), asyncHandler(createQuotation));
+quotationsRouter.post("/:id/duplicate", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(duplicateQuotation));
+quotationsRouter.patch("/:id", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), validate(updateQuotationSchema), asyncHandler(updateQuotation));
+quotationsRouter.patch("/:id/status", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), validate(changeStatusSchema), asyncHandler(changeQuotationStatus));
 
-quotationsRouter.post("/", validate(createQuotationSchema), asyncHandler(createQuotation));
-quotationsRouter.post("/:id/duplicate", validate(idSchema, "params"), asyncHandler(duplicateQuotation));
-quotationsRouter.patch("/:id", validate(idSchema, "params"), validate(updateQuotationSchema), asyncHandler(updateQuotation));
-
-// Endpoint dedicado al flujo de estados
-quotationsRouter.patch("/:id/status", validate(idSchema, "params"), validate(changeStatusSchema), asyncHandler(changeQuotationStatus));
-
-quotationsRouter.delete("/:id", validate(idSchema, "params"), roleMiddleware(["ADMINISTRADOR"]), asyncHandler(deleteQuotation));
+// Eliminación estricta
+quotationsRouter.delete("/:id", requirePermission("DELETE_QUOTATION"), validate(idSchema, "params"), asyncHandler(deleteQuotation));

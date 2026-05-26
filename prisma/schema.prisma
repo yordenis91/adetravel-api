@@ -17,9 +17,9 @@ enum UserRole {
 
 enum AgencyRole {
   GERENTE
-  AGENTE_SENIOR
-  AGENTE
-  ASISTENTE
+  FINANZAS
+  OPERACIONES
+  AGENTE_VENTAS
 }
 
 enum RequestStatus {

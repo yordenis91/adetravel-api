@@ -7,21 +7,17 @@ import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { idSchema, paymentsQuerySchema } from "../schemas/domain.schemas";
 import { createPaymentSchema, updatePaymentSchema, changePaymentStatusSchema } from "../validators/payments.validator";
-import { roleMiddleware } from "../middlewares/role.middleware";
+import { requirePermission } from "../middlewares/permission.middleware";
 
 export const paymentsRouter = Router();
 
-paymentsRouter.get("/", validate(paymentsQuerySchema, "query"), asyncHandler(listPayments));
+paymentsRouter.get("/", requirePermission("VIEW_PAYMENTS"), validate(paymentsQuerySchema, "query"), asyncHandler(listPayments));
+paymentsRouter.get("/stats", requirePermission("VIEW_PAYMENTS"), asyncHandler(getPaymentStats));
+paymentsRouter.get("/:id", requirePermission("VIEW_PAYMENTS"), validate(idSchema, "params"), asyncHandler(getPayment));
 
-// Endpoint de estadísticas (¡Importante que vaya ANTES que el /:id!)
-paymentsRouter.get("/stats", asyncHandler(getPaymentStats));
+paymentsRouter.post("/", requirePermission("MANAGE_PAYMENTS"), validate(createPaymentSchema), asyncHandler(createPayment));
+paymentsRouter.patch("/:id", requirePermission("MANAGE_PAYMENTS"), validate(idSchema, "params"), validate(updatePaymentSchema), asyncHandler(updatePayment));
+paymentsRouter.patch("/:id/status", requirePermission("MANAGE_PAYMENTS"), validate(idSchema, "params"), validate(changePaymentStatusSchema), asyncHandler(changePaymentStatus));
 
-paymentsRouter.get("/:id", validate(idSchema, "params"), asyncHandler(getPayment));
-
-paymentsRouter.post("/", validate(createPaymentSchema), asyncHandler(createPayment));
-paymentsRouter.patch("/:id", validate(idSchema, "params"), validate(updatePaymentSchema), asyncHandler(updatePayment));
-
-// Endpoint dedicado al cambio de estados
-paymentsRouter.patch("/:id/status", validate(idSchema, "params"), validate(changePaymentStatusSchema), asyncHandler(changePaymentStatus));
-
-paymentsRouter.delete("/:id", validate(idSchema, "params"), roleMiddleware(["ADMINISTRADOR"]), asyncHandler(deletePayment));
+// Eliminación estricta
+paymentsRouter.delete("/:id", requirePermission("DELETE_PAYMENT"), validate(idSchema, "params"), asyncHandler(deletePayment));

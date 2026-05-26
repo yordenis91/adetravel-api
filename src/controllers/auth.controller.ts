@@ -191,7 +191,8 @@ export async function inviteUser(req: Request, res: Response): Promise<void> {
     email: string;
     fullName: string;
     role: "ADMINISTRADOR" | "USUARIO";
-    agencyRole?: "GERENTE" | "AGENTE_SENIOR" | "AGENTE" | "ASISTENTE";
+    // 🔥 AQUÍ ESTÁ EL CAMBIO: Actualizamos a los nuevos roles
+    agencyRole?: "GERENTE" | "FINANZAS" | "OPERACIONES" | "AGENTE_VENTAS"; 
     password: string;
   };
 

@@ -1,21 +1,22 @@
 import { Router } from "express";
-import { createClient, deleteClient, getClient, listClients, updateClient } from "../controllers/clients.controller";
+import { createClient, deleteClient, getClient, listClients, updateClient, toggleClientActive } from "../controllers/clients.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { clientsQuerySchema, idSchema } from "../schemas/domain.schemas";
-import { roleMiddleware } from "../middlewares/role.middleware";
-
-// ── IMPORTAMOS EL NUEVO VALIDADOR AVANZADO ──
+// 🔥 CAMBIO: Usamos nuestro nuevo guardia de permisos
+import { requirePermission } from "../middlewares/permission.middleware";
 import { createClientSchema, updateClientSchema } from "../validators/clients.validator";
 
 export const clientsRouter = Router();
 
-clientsRouter.get("/", validate(clientsQuerySchema, "query"), asyncHandler(listClients));
-clientsRouter.get("/:id", validate(idSchema, "params"), asyncHandler(getClient));
+// Todos los que tengan permiso para ver clientes pueden listarlos
+clientsRouter.get("/", requirePermission("VIEW_CLIENTS"), validate(clientsQuerySchema, "query"), asyncHandler(listClients));
+clientsRouter.get("/:id", requirePermission("VIEW_CLIENTS"), validate(idSchema, "params"), asyncHandler(getClient));
 
-// ── APLICAMOS EL NUEVO VALIDADOR A LAS RUTAS DE CREAR Y EDITAR ──
-clientsRouter.post("/", validate(createClientSchema), asyncHandler(createClient));
-clientsRouter.patch("/:id", validate(idSchema, "params"), validate(updateClientSchema), asyncHandler(updateClient));
+// Solo quienes tengan permiso pueden crear o editar
+clientsRouter.post("/", requirePermission("CREATE_CLIENT"), validate(createClientSchema), asyncHandler(createClient));
+clientsRouter.patch("/:id", requirePermission("CREATE_CLIENT"), validate(idSchema, "params"), validate(updateClientSchema), asyncHandler(updateClient));
+clientsRouter.patch("/:id/toggle", requirePermission("CREATE_CLIENT"), validate(idSchema, "params"), asyncHandler(toggleClientActive));
 
-// ── RUTA PROTEGIDA DE ELIMINACIÓN ──
-clientsRouter.delete("/:id", validate(idSchema, "params"), roleMiddleware(["ADMINISTRADOR"]), asyncHandler(deleteClient));
+// Ruta protegida de eliminación estricta
+clientsRouter.delete("/:id", requirePermission("DELETE_CLIENT"), validate(idSchema, "params"), asyncHandler(deleteClient));

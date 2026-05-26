@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
+import bcrypt from "bcryptjs";
 import { sendItem, sendList } from "../utils/response";
 import { ApiError } from "../utils/api-error";
 import { getPagination } from "../utils/pagination";
@@ -38,7 +39,7 @@ export async function getUserStats(req: Request, res: Response): Promise<void> {
   const total = await prisma.user.count();
   const administradores = await prisma.user.count({ where: { role: "ADMINISTRADOR" } });
   const equipoOperativo = await prisma.user.count({
-    where: { agencyRole: { in: ["GERENTE", "AGENTE_SENIOR", "AGENTE"] } }
+    where: { agencyRole: { in: ["GERENTE", "FINANZAS", "OPERACIONES", "AGENTE_VENTAS"] } } // Actualizado a los nuevos roles
   });
   
   sendItem(res, { total, administradores, equipoOperativo });
@@ -57,30 +58,31 @@ export async function getUser(req: Request, res: Response): Promise<void> {
 
 export async function updateUser(req: Request, res: Response): Promise<void> {
   const targetUserId = String(req.params.id);
- const currentUser = req.user as { id: string; role: string; agencyRole?: string | null };
+  const currentUser = req.user as { id: string; role: string; agencyRole?: string | null };
   const updates = req.body;
 
   const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!targetUser) throw new ApiError("Usuario no encontrado", 404);
 
-  // 🛡️ REGLAS DE NEGOCIO (Seguridad estricta)
-  if (updates.agencyRole || updates.role) {
-    if (currentUser.agencyRole !== "GERENTE" && currentUser.role !== "ADMINISTRADOR") {
-      throw new ApiError("Solo un Administrador o Gerente puede modificar roles de agencia.", 403);
-    }
-    if (currentUser.id === targetUserId) {
-      throw new ApiError("Por seguridad, no puedes modificar tu propio rol. Solicítalo a otro administrador.", 403);
-    }
+  // 🛡️ REGLAS DE SEGURIDAD INTERNAS (Protección contra uno mismo)
+  
+  // 1. Evitar que alguien cambie su propio rol (incluso un Gerente)
+  if ((updates.agencyRole || updates.role) && currentUser.id === targetUserId) {
+    throw new ApiError("Por seguridad, no puedes modificar tu propio rol. Solicítalo a otro administrador.", 403);
   }
 
-  if (updates.isActive !== undefined && currentUser.id === targetUserId) {
+  // 2. Evitar suicidio digital (desactivar propia cuenta)
+  if (updates.isActive !== undefined && currentUser.id === targetUserId && updates.isActive === false) {
     throw new ApiError("No puedes desactivar tu propia cuenta.", 403);
   }
 
-  if (currentUser.agencyRole === "ASISTENTE" && currentUser.role !== "ADMINISTRADOR") {
-    throw new ApiError("Los Asistentes no tienen permisos para modificar perfiles de usuarios.", 403);
+// 🔥 NUEVO: Si el admin envía una nueva contraseña, la encriptamos de forma segura
+  if (updates.password) {
+    updates.passwordHash = await bcrypt.hash(updates.password, 12);
+    delete updates.password; // Borramos el texto plano para que Prisma no dé error
   }
-
+  
+  // Actualización limpia en Prisma
   const user = await prisma.user.update({
     where: { id: targetUserId },
     data: updates,

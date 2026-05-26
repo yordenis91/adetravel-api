@@ -7,21 +7,23 @@ import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { idSchema, vouchersQuerySchema } from "../schemas/domain.schemas";
 import { createVoucherSchema, updateVoucherSchema, changeVoucherStatusSchema } from "../validators/vouchers.validator";
-import { roleMiddleware } from "../middlewares/role.middleware";
+// 🔥 CAMBIO: Usamos el nuevo middleware RBAC
+import { requirePermission } from "../middlewares/permission.middleware";
 
 export const vouchersRouter = Router();
 
-vouchersRouter.get("/", validate(vouchersQuerySchema, "query"), asyncHandler(listVouchers));
+vouchersRouter.get("/", requirePermission("VIEW_VOUCHERS"), validate(vouchersQuerySchema, "query"), asyncHandler(listVouchers));
 
 // Endpoint de estadísticas (¡Debe ir ANTES que el /:id!)
-vouchersRouter.get("/stats", asyncHandler(getVoucherStats));
+vouchersRouter.get("/stats", requirePermission("VIEW_VOUCHERS"), asyncHandler(getVoucherStats));
 
-vouchersRouter.get("/:id", validate(idSchema, "params"), asyncHandler(getVoucher));
+vouchersRouter.get("/:id", requirePermission("VIEW_VOUCHERS"), validate(idSchema, "params"), asyncHandler(getVoucher));
 
-vouchersRouter.post("/", validate(createVoucherSchema), asyncHandler(createVoucher));
-vouchersRouter.patch("/:id", validate(idSchema, "params"), validate(updateVoucherSchema), asyncHandler(updateVoucher));
+vouchersRouter.post("/", requirePermission("MANAGE_VOUCHERS"), validate(createVoucherSchema), asyncHandler(createVoucher));
+vouchersRouter.patch("/:id", requirePermission("MANAGE_VOUCHERS"), validate(idSchema, "params"), validate(updateVoucherSchema), asyncHandler(updateVoucher));
 
 // Endpoint dedicado al cambio de estados
-vouchersRouter.patch("/:id/status", validate(idSchema, "params"), validate(changeVoucherStatusSchema), asyncHandler(changeVoucherStatus));
+vouchersRouter.patch("/:id/status", requirePermission("MANAGE_VOUCHERS"), validate(idSchema, "params"), validate(changeVoucherStatusSchema), asyncHandler(changeVoucherStatus));
 
-vouchersRouter.delete("/:id", validate(idSchema, "params"), roleMiddleware(["ADMINISTRADOR"]), asyncHandler(deleteVoucher));
+// Eliminación estricta
+vouchersRouter.delete("/:id", requirePermission("DELETE_VOUCHER"), validate(idSchema, "params"), asyncHandler(deleteVoucher));
