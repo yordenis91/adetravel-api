@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const AGENCY_ROLES = ["GERENTE", "AGENTE_SENIOR", "AGENTE", "ASISTENTE"] as const;
+// Alineado con el enum `AgencyRole` en prisma/schema.prisma
+export const AGENCY_ROLES = ["GERENTE", "FINANZAS", "OPERACIONES", "AGENTE_VENTAS"] as const;
 export const SYSTEM_ROLES = ["ADMINISTRADOR", "USUARIO"] as const;
 
 export const usersListQuerySchema = z.object({

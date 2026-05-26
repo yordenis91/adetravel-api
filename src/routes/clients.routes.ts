@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createClient, deleteClient, getClient, listClients, updateClient, toggleClientActive } from "../controllers/clients.controller";
+import { sendBirthdayEmails } from "../controllers/birthday.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { clientsQuerySchema, idSchema } from "../schemas/domain.schemas";
@@ -20,3 +21,6 @@ clientsRouter.patch("/:id/toggle", requirePermission("CREATE_CLIENT"), validate(
 
 // Ruta protegida de eliminación estricta
 clientsRouter.delete("/:id", requirePermission("DELETE_CLIENT"), validate(idSchema, "params"), asyncHandler(deleteClient));
+
+// Envío de felicitaciones de cumpleaños (individual o masivo)
+clientsRouter.post("/birthday", requirePermission("SEND_BIRTHDAY_EMAILS"), asyncHandler(sendBirthdayEmails));
