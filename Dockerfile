@@ -4,20 +4,23 @@ RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# Copiar package y lock para aprovechar cache
+# Copiar archivos de configuración de dependencias y base de datos
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci --production=false
+# Instalamos las dependencias necesarias para compilar TypeScript
+RUN npm ci
 
-# Generar Prisma client
+# Generar el cliente de Prisma para interactuar con PostgreSQL
 RUN npx prisma generate
 
-# Compilar TypeScript
+# 🔥 LA CORRECCIÓN: Copiar todo el código fuente en una sola línea válida
 COPY . .
+
+# Compilar el proyecto TypeScript (esto creará la carpeta /app/dist/)
 RUN npm run build
 
 EXPOSE 3000
 
-# Ejecutar la app compilada
+# Arrancar las migraciones automáticas y encender el servidor Express
 CMD ["npm", "run", "start"]
