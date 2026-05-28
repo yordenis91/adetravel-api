@@ -1,11 +1,12 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { AgencyRole } from "@prisma/client";
 import { prisma } from "../src/lib/prisma";
 
 const email = process.env.ADMIN_EMAIL || "admin@adetravel.local";
 const password = process.env.ADMIN_PASSWORD || "Admin123!";
 const fullName = process.env.ADMIN_FULL_NAME || "Administrador AdeTravel";
-const agencyRole = (process.env.ADMIN_AGENCY_ROLE as "GERENTE" | "AGENTE_SENIOR" | "AGENTE" | "ASISTENTE") || "GERENTE";
+const agencyRole = (process.env.ADMIN_AGENCY_ROLE as AgencyRole) || AgencyRole.GERENTE;
 
 async function main() {
   const normalizedEmail = email.toLowerCase().trim();
