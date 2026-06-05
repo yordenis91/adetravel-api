@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { globalSearch } from "../controllers/search.controller";
 import { authRouter } from "./auth.routes";
 import { usersRouter } from "./users.routes";
 import { clientsRouter } from "./clients.routes";
@@ -28,3 +29,4 @@ apiRouter.use("/activity-logs", activityLogsRouter);
 apiRouter.use("/system-config", systemConfigRouter);
 apiRouter.use("/email-templates", emailTemplatesRouter);
 apiRouter.use("/reports", reportsRouter);
+apiRouter.get("/search", globalSearch);
