@@ -12,12 +12,14 @@ import { activityLogsRouter } from "./activity-logs.routes";
 import { systemConfigRouter } from "./system-config.routes";
 import { emailTemplatesRouter } from "./email-templates.routes";
 import { reportsRouter } from "./reports.routes";
+import { tasksRouter } from "./tasks.routes";
 import { authMiddleware } from "../middlewares/auth.middleware";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use(authMiddleware);
+apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/users", usersRouter);
 apiRouter.use("/clients", clientsRouter);
 apiRouter.use("/providers", providersRouter);

@@ -71,6 +71,7 @@ model User {
   isActive     Boolean     @default(true)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+  tasks        Task[]
 
   @@map("users")
 }
@@ -318,4 +319,27 @@ model EmailTemplate {
   updatedAt   DateTime @updatedAt
 
   @@map("email_templates")
+}
+
+model Task {
+  id                 String   @id @default(uuid())
+  title              String
+  description        String?
+  dueDate            String
+  priority           String
+  status             String   @default("PENDIENTE")
+
+  relatedEntityType  String?
+  relatedEntityId    String?
+  relatedEntityLabel String?
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([dueDate])
+  @@map("tasks")
 }
