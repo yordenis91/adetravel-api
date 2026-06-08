@@ -7,13 +7,15 @@ import { createActivityLog } from "../services/activity-log.service";
 // Listar mis tareas
 export async function listTasks(req: Request, res: Response): Promise<void> {
   const userId = req.user!.id;
-  const { status } = req.query as { status?: string };
+  const { status, relatedEntityId, relatedEntityType } = req.query as { status?: string, relatedEntityId?: string, relatedEntityType?: string };
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 20;
   const skip = (page - 1) * limit;
 
   const where: any = { userId };
   if (status) where.status = status;
+  if (relatedEntityId) where.relatedEntityId = relatedEntityId;
+  if (relatedEntityType) where.relatedEntityType = relatedEntityType;
 
   const [tasks, total] = await Promise.all([
     prisma.task.findMany({
