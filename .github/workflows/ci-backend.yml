@@ -21,7 +21,7 @@ jobs:
           node-version: '20'
 
       - name: 📦 Instalar dependencias
-        run: npm install
+        run: npm ci
 
       - name: 🗄️ Generar Cliente Prisma
         run: npx prisma generate
@@ -30,3 +30,8 @@ jobs:
 
       - name: 🔨 Construir TypeScript
         run: npm run build
+      
+      - name: 🚀 Notificar a EasyPanel (despliegue)
+        if: success()
+        run: |
+          curl -X POST "http://49.13.19.148:3000/api/deploy/0a99f97345d7eb0495fd0f597dc719ac9f485c4a4427ba7e"
