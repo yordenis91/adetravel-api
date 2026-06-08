@@ -25,6 +25,8 @@ jobs:
 
       - name: 🗄️ Generar Cliente Prisma
         run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://dummy:5432/db?schema=public"  
 
       - name: 🔨 Construir TypeScript
         run: npm run build
