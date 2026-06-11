@@ -72,6 +72,7 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   tasks        Task[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -342,4 +343,23 @@ model Task {
   @@index([userId, status])
   @@index([dueDate])
   @@map("tasks")
+}
+
+
+model Notification {
+  id                String   @id @default(uuid())
+  userId            String
+  title             String
+  message           String
+  type              String   @default("INFO")
+  isRead            Boolean  @default(false)
+  relatedEntityId   String?
+  relatedEntityType String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }

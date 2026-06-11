@@ -39,6 +39,18 @@ export async function createTask(req: Request, res: Response): Promise<void> {
     data: { ...data, userId }
   });
 
+  // 🔥 NOTIFICACIÓN: Tarea creada
+  await prisma.notification.create({
+    data: {
+      userId: task.userId,
+      title: "Nueva Tarea",
+      message: `Se ha registrado la tarea: ${task.title}`,
+      type: "INFO",
+      relatedEntityId: task.id,
+      relatedEntityType: "TASK"
+    }
+  });
+
   // Si la tarea tiene una prioridad ALTA, la registramos en la bitácora
   if (task.priority === "ALTA") {
     await createActivityLog({
@@ -68,6 +80,18 @@ export async function updateTask(req: Request, res: Response): Promise<void> {
       action: "UPDATE", entityType: "Task", entityId: updated.id,
       entityLabel: updated.title, description: "Tarea marcada como COMPLETADA",
       performedBy: userId
+    });
+
+    // 🔥 NOTIFICACIÓN: Tarea completada
+    await prisma.notification.create({
+      data: {
+        userId: updated.userId,
+        title: "Tarea Completada 🎉",
+        message: `Excelente, has completado: ${updated.title}`,
+        type: "SUCCESS",
+        relatedEntityId: updated.id,
+        relatedEntityType: "TASK"
+      }
     });
   }
 
