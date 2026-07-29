@@ -48,3 +48,27 @@ export async function markAllAsRead(req: Request, res: Response): Promise<void> 
   const result = await prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
   sendItem(res, { ok: true, updated: result.count });
 }
+
+// Eliminar una notificación específica
+export async function deleteNotification(req: Request, res: Response): Promise<void> {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const userId = req.user!.id;
+
+  const existing = await prisma.notification.findFirst({ where: { id, userId } });
+  if (!existing) throw new ApiError("Notificación no encontrada", 404, "NOT_FOUND");
+
+  await prisma.notification.delete({ where: { id } });
+  sendItem(res, { ok: true, message: "Notificación eliminada correctamente" });
+}
+
+// Obtener estadísticas de notificaciones
+export async function getNotificationStats(req: Request, res: Response): Promise<void> {
+  const userId = req.user!.id;
+  
+  const [unreadCount, totalCount] = await Promise.all([
+    prisma.notification.count({ where: { userId, isRead: false } }),
+    prisma.notification.count({ where: { userId } })
+  ]);
+
+  sendItem(res, { unreadCount, totalCount });
+}

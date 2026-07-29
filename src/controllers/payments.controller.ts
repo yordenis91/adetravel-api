@@ -121,7 +121,6 @@ export async function updatePayment(req: Request, res: Response): Promise<void> 
 export async function changePaymentStatus(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id);
   const newStatus = req.body.status.toUpperCase();
-
   const existing = await prisma.payment.findUnique({ where: { id }, include: { client: true } });
   if (!existing) throw new ApiError("Pago no encontrado", 404);
 
@@ -130,6 +129,12 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
   if (!allowed.includes(newStatus)) {
     throw new ApiError(`Transición inválida. No se puede pasar de ${currentStatus} a ${newStatus}`, 409);
   }
+
+  // Determinar si el pago pasará a estado COMPLETADO (comparando previo y nuevo)
+  const prevStatusUpper = (existing.status || "").toUpperCase();
+  const newStatusIsCompleted = newStatus === "COMPLETADO" || newStatus === "COMPLETED";
+  const prevWasCompleted = prevStatusUpper === "COMPLETADO" || prevStatusUpper === "COMPLETED";
+  const justCompleted = !prevWasCompleted && newStatusIsCompleted;
 
   const updated = await prisma.payment.update({
     where: { id },
@@ -145,6 +150,30 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
       fallbackSubject: `Pago ${updated.paymentNumber} confirmado`,
       fallbackHtml: `<p>Estimado/a ${updated.client.firstName}, su pago por ${updated.currency} ${updated.amount} ha sido procesado exitosamente.</p>`
     }).catch(e => console.error("Error enviando email de pago:", e));
+  }
+
+  // Crear notificación automática si el pago acaba de completarse
+  if (justCompleted) {
+    try {
+      const userToNotify = updated.request?.createdBy || req.user?.id; // TODO: ajustar destinatario según la lógica de negocio
+      if (userToNotify) {
+        await prisma.notification.create({
+          data: {
+            userId: userToNotify,
+            title: "Pago Recibido 🎉",
+            message: `El pago ${updated.paymentNumber || updated.id} por ${updated.amount} ${updated.currency} ha sido completado.`,
+            type: "PAYMENT_COMPLETED",
+            isRead: false,
+            relatedEntityType: "PAGO",
+            relatedEntityId: updated.id
+          }
+        });
+      } else {
+        console.warn("Notificación de pago completado: no se encontró userId para notificar");
+      }
+    } catch (e) {
+      console.error("Error creando notificación de pago completado:", e);
+    }
   }
 
   // Bonus: Sincronizar estado de la solicitud a VENDIDA si se completa el pago
