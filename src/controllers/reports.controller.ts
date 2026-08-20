@@ -51,8 +51,18 @@ export async function getReport(req: Request, res: Response): Promise<void> {
   const clientsBySource = cliGroups.map(g => ({ source: g.referralSource || "OTROS", count: g._count.id }));
 
   // --- Tabla de Recientes ---
+  // "Confirmadas" = ya confirmadas por el proveedor (CONFIRMADA_POR_PROVEEDOR) o en cualquier
+  // estado posterior del flujo granular, hasta VENDIDA.
   const recentConfirmed = await prisma.request.findMany({
-    where: { ...dateFilter, status: { in: ["CONFIRMADA", "VENDIDA"] } },
+    where: {
+      ...dateFilter,
+      status: {
+        in: [
+          "CONFIRMADA_POR_PROVEEDOR", "ENVIADA_CONFIRMACION_CLIENTE", "ENVIADA_SOLICITUD_PAGO_CLIENTE",
+          "PAGADO_POR_CLIENTE", "PAGADO_AL_PROVEEDOR", "VOUCHER_EMITIDO", "VOUCHER_ENTREGADO", "VENDIDA"
+        ]
+      }
+    },
     orderBy: { createdAt: "desc" },
     take: 5,
     select: { 

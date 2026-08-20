@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
+import { createActivityLog } from "../src/services/activity-log.service";
+import { getAdminUser } from "./seed-helpers";
 
 const clients = [
   {
@@ -227,6 +229,11 @@ const clients = [
 async function main() {
   console.log("🌱 Iniciando seed de clientes...");
 
+  // Todos los clientes se insertan "como si los hubiera registrado el administrador" desde el
+  // formulario de Clientes (regla de negocio 1.1): createdBy = admin.id + entrada en Bitácora,
+  // igual que dejaría el flujo real de la UI (ver clients.controller.ts::createClient).
+  const admin = await getAdminUser();
+
   for (const client of clients) {
     const existingClient = await prisma.client.findFirst({
       where: { rut: client.rut },
@@ -242,7 +249,17 @@ async function main() {
     const created = await prisma.client.create({
       data: {
         ...client,
+        createdBy: admin.id,
       },
+    });
+
+    await createActivityLog({
+      action: "CREATE",
+      entityType: "Client",
+      entityId: created.id,
+      entityLabel: `${created.firstName} ${created.lastName}`,
+      description: "Cliente registrado",
+      performedBy: admin.id,
     });
 
     console.log(

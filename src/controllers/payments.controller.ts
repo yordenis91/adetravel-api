@@ -6,6 +6,7 @@ import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
+import { advanceWorkflowStatus } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/payments.validator";
 
 export async function listPayments(req: Request, res: Response): Promise<void> {
@@ -176,9 +177,12 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
     }
   }
 
-  // Bonus: Sincronizar estado de la solicitud a VENDIDA si se completa el pago
+  // Sincronización con el flujo granular (regla 4.15 / sección de estados, pág. 11): el pago
+  // del cliente es un paso intermedio, no el cierre de la venta. Pasa a PAGADO_POR_CLIENTE y
+  // desciende automáticamente a todos los Servicios de la Solicitud. La Solicitud solo llega a
+  // VENDIDA más adelante, tras pago al proveedor y entrega de voucher (ver requests.controller).
   if (newStatus === "COMPLETADO" && existing.requestId) {
-    await prisma.request.update({ where: { id: existing.requestId }, data: { status: "VENDIDA" } });
+    await advanceWorkflowStatus(existing.requestId, null, "PAGADO_POR_CLIENTE");
   }
 
   await createActivityLog({ action: "UPDATE", entityType: "Payment", entityId: id, entityLabel: existing.paymentNumber, description: `Estado cambiado de ${currentStatus} a ${newStatus}`, performedBy: req.user!.id });

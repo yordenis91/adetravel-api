@@ -6,6 +6,7 @@ import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
+import { generateVoucherPdfBuffer } from "../services/pdf.service";
 import { VALID_TRANSITIONS } from "../validators/vouchers.validator";
 
 export async function listVouchers(req: Request, res: Response): Promise<void> {
@@ -65,6 +66,19 @@ export async function getVoucher(req: Request, res: Response): Promise<void> {
   });
   if (!item) throw new ApiError("Voucher no encontrado", 404, "VOUCHER_NOT_FOUND");
   sendItem(res, item);
+}
+
+export async function downloadVoucherPdf(req: Request, res: Response): Promise<void> {
+  const item = await prisma.voucher.findUnique({
+    where: { id: String(req.params.id) },
+    include: { client: true, provider: true }
+  });
+  if (!item) throw new ApiError("Voucher no encontrado", 404, "VOUCHER_NOT_FOUND");
+
+  const buffer = await generateVoucherPdfBuffer(item);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${item.voucherNumber}.pdf"`);
+  res.send(buffer);
 }
 
 export async function createVoucher(req: Request, res: Response): Promise<void> {

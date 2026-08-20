@@ -20,6 +20,7 @@ export const quotationItemSchema = z.object({
 
 const baseQuotationSchema = z.object({
   requestId: z.string().min(1, "La solicitud es obligatoria"),
+  serviceId: z.string().optional().nullable(),
   clientId: z.string().min(1, "El cliente es obligatorio"),
   validUntil: z.string().optional(), // Agregado para que no se borre la fecha
   currency: z.enum(["CLP", "USD"]).default("CLP"),

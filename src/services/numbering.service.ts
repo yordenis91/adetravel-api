@@ -1,13 +1,15 @@
 import { prisma } from "../lib/prisma";
 import { ApiError } from "../utils/api-error";
 
-type NumberingEntity = "Request" | "Quotation" | "Payment" | "Voucher";
+type NumberingEntity = "Request" | "Quotation" | "Payment" | "Voucher" | "Service" | "Confirmation";
 
 const entityFieldMap: Record<NumberingEntity, string> = {
   Request: "requestNumber",
   Quotation: "quotationNumber",
   Payment: "paymentNumber",
-  Voucher: "voucherNumber"
+  Voucher: "voucherNumber",
+  Service: "serviceNumber",
+  Confirmation: "confirmationNumber"
 };
 
 export async function generateNumber(entity: NumberingEntity, prefix: string): Promise<string> {

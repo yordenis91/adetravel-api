@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { 
-  createQuotation, deleteQuotation, getQuotation, listQuotations, 
-  updateQuotation, changeQuotationStatus, previewQuotation, duplicateQuotation 
+import {
+  createQuotation, deleteQuotation, getQuotation, listQuotations,
+  updateQuotation, changeQuotationStatus, previewQuotation, downloadQuotationPdf, duplicateQuotation
 } from "../controllers/quotations.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
@@ -14,6 +14,7 @@ export const quotationsRouter = Router();
 quotationsRouter.get("/", requirePermission("VIEW_QUOTATIONS"), validate(quotationsQuerySchema, "query"), asyncHandler(listQuotations));
 quotationsRouter.get("/:id", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(getQuotation));
 quotationsRouter.get("/:id/preview", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(previewQuotation));
+quotationsRouter.get("/:id/pdf", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(downloadQuotationPdf));
 
 quotationsRouter.post("/", requirePermission("MANAGE_QUOTATIONS"), validate(createQuotationSchema), asyncHandler(createQuotation));
 quotationsRouter.post("/:id/duplicate", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(duplicateQuotation));

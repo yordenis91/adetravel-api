@@ -5,6 +5,7 @@ import { ApiError } from "../utils/api-error";
 import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { generateNumber } from "../services/numbering.service";
+import { syncServicesOnRequestStatusChange } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/requests.validator";
 
 export async function listRequests(req: Request, res: Response): Promise<void> {
@@ -35,12 +36,24 @@ export async function listRequests(req: Request, res: Response): Promise<void> {
 
 export async function getRequest(req: Request, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const item = await prisma.request.findUnique({ 
-    where: { id }, 
-    include: { client: true, quotations: true, payments: true, vouchers: true } 
+  const item = await prisma.request.findUnique({
+    where: { id },
+    include: { client: true, quotations: true, payments: true, vouchers: true, servicesList: true, confirmations: true }
   });
   if (!item) throw new ApiError("Solicitud no encontrada", 404, "REQUEST_NOT_FOUND");
   sendItem(res, item);
+}
+
+export async function getRequestServices(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const data = await prisma.service.findMany({ where: { requestId: id }, orderBy: { createdAt: "desc" } });
+  sendList(res, data, data.length, 1, data.length || 1);
+}
+
+export async function getRequestConfirmations(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const data = await prisma.confirmation.findMany({ where: { requestId: id }, orderBy: { createdAt: "desc" } });
+  sendList(res, data, data.length, 1, data.length || 1);
 }
 
 export async function getRequestQuotations(req: Request, res: Response): Promise<void> {
@@ -90,6 +103,7 @@ export async function changeRequestStatus(req: Request, res: Response): Promise<
   const id = req.params.id as string;
   const newStatus = req.body.status.toUpperCase();
   const notes = req.body.notes;
+  const cancellationReason = req.body.cancellationReason;
 
   const existing = await prisma.request.findUnique({ where: { id } });
   if (!existing) throw new ApiError("Solicitud no encontrada", 404, "REQUEST_NOT_FOUND");
@@ -97,25 +111,27 @@ export async function changeRequestStatus(req: Request, res: Response): Promise<
   const currentStatus = existing.status;
   const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
 
-  if (!allowed.includes(newStatus)) {
+  // Regla de negocio: un administrador puede cancelar una solicitud en cualquier momento,
+  // saltándose el mapa de transiciones (siempre exige motivo, ya validado por el esquema).
+  const isAdminForceCancel = newStatus === "CANCELADA" && req.user?.role === "ADMINISTRADOR";
+
+  if (!allowed.includes(newStatus) && !isAdminForceCancel) {
     throw new ApiError(`Transición inválida de ${currentStatus} a ${newStatus}`, 409, "INVALID_TRANSITION");
   }
 
-  if (newStatus === "CONFIRMADA") {
-    const acceptedQuotation = await prisma.quotation.findFirst({ where: { requestId: id, status: "ACEPTADA" } });
-    if (!acceptedQuotation) throw new ApiError("Para confirmar debe existir al menos una cotización Aceptada", 409, "NO_ACCEPTED_QUOTATION");
-  }
+  const updateData: Record<string, unknown> = { status: newStatus };
+  if (newStatus === "CANCELADA") updateData.cancellationReason = cancellationReason;
 
-  if (newStatus === "VENDIDA") {
-    const completedPayment = await prisma.payment.findFirst({ where: { requestId: id, status: "COMPLETADO" } });
-    if (!completedPayment) throw new ApiError("Para marcar como Vendida debe existir al menos un pago Completado", 409, "NO_COMPLETED_PAYMENT");
-  }
+  const updated = await prisma.request.update({ where: { id }, data: updateData as never });
 
-  const updated = await prisma.request.update({ where: { id }, data: { status: newStatus as any } });
-  await createActivityLog({ 
-    action: "UPDATE", entityType: "Request", entityId: id, entityLabel: existing.requestNumber, 
-    description: `Cambio de estado: ${currentStatus} -> ${newStatus}. ${notes || ""}`, 
-    performedBy: req.user!.id 
+  // Cascada hacia los Servicios: siempre en solicitudes Paquete, o cuando el estado es de
+  // los que descienden automáticamente (ver CASCADE_DOWN_STATUSES en workflow-status.ts).
+  await syncServicesOnRequestStatusChange(id, newStatus, existing.isPackage);
+
+  await createActivityLog({
+    action: "UPDATE", entityType: "Request", entityId: id, entityLabel: existing.requestNumber,
+    description: `Cambio de estado: ${currentStatus} -> ${newStatus}. ${notes || cancellationReason || ""}`,
+    performedBy: req.user!.id
   });
 
   sendItem(res, updated);
@@ -154,7 +170,9 @@ export async function deleteRequest(req: Request, res: Response): Promise<void> 
     throw new ApiError("No se puede eliminar porque tiene pagos o vouchers asociados.", 409, "REQUEST_HAS_RELATIONS");
   }
 
-  await prisma.quotation.deleteMany({ where: { requestId: id } }); 
+  await prisma.confirmation.deleteMany({ where: { requestId: id } });
+  await prisma.quotation.deleteMany({ where: { requestId: id } });
+  await prisma.service.deleteMany({ where: { requestId: id } });
   const item = await prisma.request.delete({ where: { id } });
   
   await createActivityLog({ action: "DELETE", entityType: "Request", entityId: id, entityLabel: item.requestNumber, performedBy: req.user?.id });

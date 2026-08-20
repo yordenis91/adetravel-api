@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { 
-  createVoucher, deleteVoucher, getVoucher, listVouchers, 
-  updateVoucher, changeVoucherStatus, getVoucherStats 
+import {
+  createVoucher, deleteVoucher, getVoucher, listVouchers,
+  updateVoucher, changeVoucherStatus, getVoucherStats, downloadVoucherPdf
 } from "../controllers/vouchers.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
@@ -18,6 +18,7 @@ vouchersRouter.get("/", requirePermission("VIEW_VOUCHERS"), validate(vouchersQue
 vouchersRouter.get("/stats", requirePermission("VIEW_VOUCHERS"), asyncHandler(getVoucherStats));
 
 vouchersRouter.get("/:id", requirePermission("VIEW_VOUCHERS"), validate(idSchema, "params"), asyncHandler(getVoucher));
+vouchersRouter.get("/:id/pdf", requirePermission("VIEW_VOUCHERS"), validate(idSchema, "params"), asyncHandler(downloadVoucherPdf));
 
 vouchersRouter.post("/", requirePermission("MANAGE_VOUCHERS"), validate(createVoucherSchema), asyncHandler(createVoucher));
 vouchersRouter.patch("/:id", requirePermission("MANAGE_VOUCHERS"), validate(idSchema, "params"), validate(updateVoucherSchema), asyncHandler(updateVoucher));

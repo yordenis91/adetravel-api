@@ -1,4 +1,4 @@
-import { PaymentMethod, PaymentStatus, QuotationStatus, RequestStatus, VoucherStatus } from "@prisma/client";
+import { PaymentMethod, PaymentStatus, QuotationStatus, WorkflowStatus, VoucherStatus, ServiceType } from "@prisma/client";
 import { z } from "zod";
 import { idParamSchema, paginationQuerySchema } from "./common.schemas";
 
@@ -28,13 +28,32 @@ export const providerUpdateSchema = providerCreateSchema.partial();
 export const requestsQuerySchema = paginationQuerySchema.extend({
   status: z.preprocess(
     (val) => (typeof val === "string" ? val.toUpperCase() : val),
-    z.nativeEnum(RequestStatus)
+    z.nativeEnum(WorkflowStatus)
   ).optional(),
   clientId: z.string().uuid().optional(),
   search: z.string().optional()
 });
 export const requestCreateSchema = z.object({ clientId: z.string().uuid() }).passthrough();
 export const requestUpdateSchema = requestCreateSchema.partial();
+
+export const servicesQuerySchema = paginationQuerySchema.extend({
+  status: z.preprocess(
+    (val) => (typeof val === "string" ? val.toUpperCase() : val),
+    z.nativeEnum(WorkflowStatus)
+  ).optional(),
+  type: z.nativeEnum(ServiceType).optional(),
+  requestId: z.string().uuid().optional(),
+  providerId: z.string().uuid().optional(),
+  clientId: z.string().uuid().optional(),
+  search: z.string().optional()
+});
+
+export const confirmationsQuerySchema = paginationQuerySchema.extend({
+  requestId: z.string().uuid().optional(),
+  serviceId: z.string().uuid().optional(),
+  providerId: z.string().uuid().optional(),
+  search: z.string().optional()
+});
 
 export const quotationsQuerySchema = paginationQuerySchema.extend({
   status: z.preprocess(

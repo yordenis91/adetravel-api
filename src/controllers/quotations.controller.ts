@@ -7,8 +7,9 @@ import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
 import { calculateTotals, normalizeItems } from "../services/quotation.calc";
+import { advanceWorkflowStatus } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/quotations.validator";
-import { buildQuotationHtml } from "../services/pdf.service";
+import { buildQuotationHtml, generateQuotationPdfBuffer } from "../services/pdf.service";
 
 export async function listQuotations(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -45,6 +46,13 @@ export async function createQuotation(req: Request, res: Response): Promise<void
     throw new ApiError(`No se pueden agregar cotizaciones a una solicitud en estado "${parentRequest.status}"`, 409);
   }
 
+  // 1b. Si se indica un Servicio, debe pertenecer a la misma Solicitud (regla de "Paquete": si
+  // parentRequest.isPackage es true, no es necesario especificar el servicio, ver sección 4.6).
+  if (data.serviceId) {
+    const service = await prisma.service.findFirst({ where: { id: data.serviceId, requestId: data.requestId } });
+    if (!service) throw new ApiError("El servicio no pertenece a la solicitud indicada", 400);
+  }
+
   const config = await prisma.systemConfig.findFirst();
   const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix ?? "COTIZ");
 
@@ -74,11 +82,10 @@ export async function createQuotation(req: Request, res: Response): Promise<void
     }
   });
 
-  // 4. Sincronización Automática con la Solicitud
-  if (parentRequest.status === "RECEPCIONADA") {
-    await prisma.request.update({ where: { id: data.requestId }, data: { status: "COTIZADA" } });
-    await createActivityLog({ action: "UPDATE", entityType: "Request", entityId: parentRequest.id, entityLabel: parentRequest.requestNumber, description: "Cambiada a Cotizada automáticamente", performedBy: req.user?.id });
-  }
+  // 4. Sincronización automática: crear la cotización final representa la sección 4.7
+  // ("Crear oferta final") del documento -> avanza el Servicio/Solicitud a COTIZADO_POR_ADETRAVEL
+  // (si aún no había llegado ahí; nunca retrocede ni reactiva una entidad Cancelada).
+  await advanceWorkflowStatus(data.requestId, data.serviceId ?? null, "COTIZADO_POR_ADETRAVEL");
 
   await createActivityLog({ action: "CREATE", entityType: "Quotation", entityId: item.id, entityLabel: item.quotationNumber, performedBy: req.user?.id });
   sendItem(res, item, 201);
@@ -129,12 +136,21 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
     throw new ApiError("El cliente no tiene un email registrado para enviar la cotización.", 409, "CLIENT_NO_EMAIL");
   }
 
-  // Sincronización automática a Solicitud Confirmada
-  if (newStatus === "ACEPTADA" && existing.requestId) {
-    await prisma.request.update({ where: { id: existing.requestId }, data: { status: "CONFIRMADA" } });
-  }
-
   const updated = await prisma.quotation.update({ where: { id }, data: { status: newStatus as any } });
+
+  // Sincronización automática con el flujo granular: 4.8 "Envío de Oferta al Cliente" ->
+  // ENVIADO_AL_CLIENTE; 4.9 "Aceptación del cliente" -> ACEPTADA_POR_CLIENTE. La sección 4
+  // describe ambas acciones como aplicables "al servicio o la solicitud", por lo que, igual que
+  // en la creación de la cotización, respetan existing.serviceId cuando la cotización es de un
+  // Servicio puntual (burbujeando a la Solicitud solo si TODOS sus servicios llegan al mismo
+  // estado — ver BUBBLE_UP_STATUSES) y solo operan directo sobre la Solicitud cuando no hay
+  // Servicio asociado (modo Paquete).
+  if (newStatus === "ENVIADA") {
+    await advanceWorkflowStatus(existing.requestId, existing.serviceId, "ENVIADO_AL_CLIENTE");
+  }
+  if (newStatus === "ACEPTADA") {
+    await advanceWorkflowStatus(existing.requestId, existing.serviceId, "ACEPTADA_POR_CLIENTE");
+  }
 
   // Envío de correo según estado
   if (existing.client.email && ["ENVIADA", "ACEPTADA", "RECHAZADA"].includes(newStatus)) {
@@ -190,6 +206,17 @@ export async function previewQuotation(req: Request, res: Response): Promise<voi
   const html = buildQuotationHtml(quotation);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(html);
+}
+
+export async function downloadQuotationPdf(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const quotation = await prisma.quotation.findUnique({ where: { id }, include: { client: true } });
+  if (!quotation) throw new ApiError("Cotización no encontrada", 404);
+
+  const buffer = await generateQuotationPdfBuffer(quotation);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${quotation.quotationNumber}.pdf"`);
+  res.send(buffer);
 }
 
 export async function deleteQuotation(req: Request, res: Response): Promise<void> {

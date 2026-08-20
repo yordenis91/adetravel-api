@@ -10,6 +10,13 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed:admin": "ts-node prisma/seed-admin.ts",
+    "seed:users": "ts-node prisma/seed-users.ts",
+    "seed:clients": "ts-node prisma/seed-clients.ts",
+    "seed:providers": "ts-node prisma/seed-providers.ts",
+    "seed:catalogs": "ts-node prisma/seed-catalogs.ts",
+    "seed:config": "ts-node prisma/seed-system-config.ts",
+    "seed:flow": "ts-node prisma/seed-flow.ts",
+    "seed:all": "npm run seed:admin && npm run seed:users && npm run seed:config && npm run seed:catalogs && npm run seed:clients && npm run seed:providers && npm run seed:flow",
     "test": "jest --passWithNoTests"
   },
   "keywords": [
@@ -24,6 +31,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@react-pdf/renderer": "^4.4.0",
     "axios": "^1.16.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
@@ -32,10 +40,12 @@
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "pg": "^8.20.0",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2",
+    "react": "^18.3.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -44,7 +54,9 @@
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.6.0",
+    "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.3",
+    "@types/react": "^18.3.12",
     "@types/supertest": "^6.0.3",
     "jest": "^30.2.0",
     "prisma": "^7.8.0",

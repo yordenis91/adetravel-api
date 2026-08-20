@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createRequest, deleteRequest, getRequest, listRequests, updateRequest,
   getRequestQuotations, getRequestPayments, getRequestVouchers,
+  getRequestServices, getRequestConfirmations,
   changeRequestStatus, duplicateRequest, getRequestStats
 } from "../controllers/requests.controller";
 import { asyncHandler } from "../utils/async-handler";
@@ -19,6 +20,8 @@ requestsRouter.get("/:id", requirePermission("VIEW_REQUESTS"), validate(idSchema
 requestsRouter.get("/:id/quotations", requirePermission("VIEW_REQUESTS"), validate(idSchema, "params"), asyncHandler(getRequestQuotations));
 requestsRouter.get("/:id/payments", requirePermission("VIEW_REQUESTS"), validate(idSchema, "params"), asyncHandler(getRequestPayments));
 requestsRouter.get("/:id/vouchers", requirePermission("VIEW_REQUESTS"), validate(idSchema, "params"), asyncHandler(getRequestVouchers));
+requestsRouter.get("/:id/services", requirePermission("VIEW_REQUESTS"), validate(idSchema, "params"), asyncHandler(getRequestServices));
+requestsRouter.get("/:id/confirmations", requirePermission("VIEW_REQUESTS"), validate(idSchema, "params"), asyncHandler(getRequestConfirmations));
 
 requestsRouter.post("/", requirePermission("MANAGE_REQUESTS"), validate(createRequestSchema), asyncHandler(createRequest));
 requestsRouter.post("/:id/duplicate", requirePermission("MANAGE_REQUESTS"), validate(idSchema, "params"), asyncHandler(duplicateRequest));

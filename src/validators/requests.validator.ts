@@ -1,23 +1,15 @@
 import { z } from "zod";
+import { VALID_TRANSITIONS, WORKFLOW_STATUSES, changeStatusSchema } from "./workflow-status";
 
 export const SERVICE_TYPES = [
   "HOTEL", "AEREO", "TOUR", "TRANSFER", "SEGURO", "RENT_A_CAR", "CRUCERO", "OTRO"
 ] as const;
 
-export const REQUEST_STATUSES = [
-  "Recepcionada", "Cotizada", "Confirmada", "Vendida", "Cancelada"
-] as const;
-
-export type RequestStatus = (typeof REQUEST_STATUSES)[number];
-
-// Mapa estricto de transiciones permitidas
-export const VALID_TRANSITIONS: Record<string, string[]> = {
-  RECEPCIONADA: ["COTIZADA", "CANCELADA"],
-  COTIZADA:     ["CONFIRMADA", "CANCELADA", "RECEPCIONADA"],
-  CONFIRMADA:   ["VENDIDA", "CANCELADA", "COTIZADA"], 
-  VENDIDA:      [], 
-  CANCELADA:    ["RECEPCIONADA"]
-};
+// El flujo de 17 estados y su mapa de transiciones ahora vive en ./workflow-status.ts
+// (compartido con Service). Se re-exportan aquí para no romper los imports existentes.
+export { VALID_TRANSITIONS, WORKFLOW_STATUSES, changeStatusSchema };
+export const REQUEST_STATUSES = WORKFLOW_STATUSES;
+export type RequestStatus = (typeof WORKFLOW_STATUSES)[number];
 
 // 1. Creamos el ESQUEMA BASE puro (sin refinamientos)
 const baseRequestSchema = z.object({
@@ -44,20 +36,15 @@ const validateBudget = (data: any) => {
 };
 
 // 3. Aplicamos el refinamiento a la versión de Creación
-export const createRequestSchema = baseRequestSchema.refine(validateBudget, { 
-  message: "El presupuesto maximo debe ser mayor o igual al minimo", 
-  path: ["budgetMax"] 
+export const createRequestSchema = baseRequestSchema.refine(validateBudget, {
+  message: "El presupuesto maximo debe ser mayor o igual al minimo",
+  path: ["budgetMax"]
 });
 
 // 4. Aplicamos .partial() AL ESQUEMA BASE y luego lo refinamos para la actualización
-export const updateRequestSchema = baseRequestSchema.partial().refine(validateBudget, { 
-  message: "El presupuesto maximo debe ser mayor o igual al minimo", 
-  path: ["budgetMax"] 
-});
-
-export const changeStatusSchema = z.object({
-  status: z.enum(REQUEST_STATUSES),
-  notes: z.string().max(500).optional()
+export const updateRequestSchema = baseRequestSchema.partial().refine(validateBudget, {
+  message: "El presupuesto maximo debe ser mayor o igual al minimo",
+  path: ["budgetMax"]
 });
 
 // 5. Exports de tipos inferidos (¡Los que notaste antes!)

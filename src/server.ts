@@ -2,7 +2,9 @@
 import { app } from "./app";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
+import { registerJobs } from "./jobs";
 
 app.listen(env.PORT, "0.0.0.0", () => {
   logger.info(`AdeTravel backend running on port ${env.PORT}`);
+  registerJobs();
 });

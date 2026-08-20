@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
+import { createActivityLog } from "../src/services/activity-log.service";
+import { getAdminUser } from "./seed-helpers";
 
 const providers = [
   {
@@ -122,10 +124,62 @@ const providers = [
     vatPercentage: 19,
     isActive: true,
   },
+  {
+    name: "LATAM AIRLINES GROUP S.A.",
+    fantasyName: "LATAM Airlines",
+    rut: "83.345.678-9",
+    country: "Chile",
+    city: "Santiago",
+    address: "Av. Presidente Riesco 5711, Las Condes, Santiago",
+    phone: "+56 2 2565 1010",
+    email: "reservas.corporativo@latam.com",
+    businessType: "AIRLINE",
+    executiveName: "Ignacio Torres Bravo",
+    executivePhone: "+56 9 4321 0987",
+    executiveEmail: "ignacio.torres@latam.com",
+    contactName: "Valentina Rojas Muñoz",
+    contactPhone: "+56 9 4321 0988",
+    contactEmail: "valentina.rojas@latam.com",
+    contactRut: "19.234.567-8",
+    bankAccount: "888999000",
+    bankName: "Banco de Chile",
+    bankAccountHolder: "LATAM AIRLINES GROUP S.A.",
+    paymentMethod: "TRANSFER",
+    vatPercentage: 19,
+    isActive: true,
+  },
+  {
+    name: "TRASLADOS Y EXCURSIONES DEL SUR SPA",
+    fantasyName: "Traslados del Sur",
+    rut: "84.456.789-0",
+    country: "Chile",
+    city: "Puerto Varas",
+    address: "Camino a Ensenada Km 5, Puerto Varas",
+    phone: "+56 65 223 3456",
+    email: "reservas@trasladosdelsur.cl",
+    businessType: "TOURIST_SERVICES",
+    executiveName: "Matías Contreras Leiva",
+    executivePhone: "+56 9 3210 9876",
+    executiveEmail: "matias.contreras@trasladosdelsur.cl",
+    contactName: "Javiera Sepúlveda Ortiz",
+    contactPhone: "+56 9 3210 9877",
+    contactEmail: "javiera.sepulveda@trasladosdelsur.cl",
+    contactRut: "20.345.678-9",
+    bankAccount: "112233445",
+    bankName: "Banco Estado",
+    bankAccountHolder: "TRASLADOS Y EXCURSIONES DEL SUR SPA",
+    paymentMethod: "TRANSFER",
+    vatPercentage: 19,
+    isActive: true,
+  },
 ];
 
 async function main() {
   console.log("🌱 Iniciando seed de proveedores...");
+
+  // Igual que Clientes: se registran "como si los hubiera cargado el administrador"
+  // (createdBy + Bitácora), reflejando el flujo real de la UI de Proveedores.
+  const admin = await getAdminUser();
 
   for (const provider of providers) {
     const existingProvider = await prisma.provider.findFirst({
@@ -140,7 +194,17 @@ async function main() {
     const created = await prisma.provider.create({
       data: {
         ...provider,
+        createdBy: admin.id,
       },
+    });
+
+    await createActivityLog({
+      action: "CREATE",
+      entityType: "Provider",
+      entityId: created.id,
+      entityLabel: created.name,
+      description: "Proveedor registrado",
+      performedBy: admin.id,
     });
 
     console.log(`✅ Proveedor creado: ${created.name} (ID: ${created.id})`);
