@@ -100,6 +100,7 @@ model User {
   updatedAt            DateTime       @updatedAt
   tasks                Task[]
   notifications        Notification[]
+  userPermissions      UserPermission[]
 
   @@map("users")
 }
@@ -348,6 +349,69 @@ model ActivityLog {
   updatedAt   DateTime @updatedAt
 
   @@map("activity_logs")
+}
+
+// ─── PERMISOS GRANULARES (RBAC dinámico) ───────────────────────────────
+// El catálogo de permisos y la matriz por defecto rol→permisos siguen
+// viviendo en src/config/permissions.ts (código). Estas tablas permiten
+// que un administrador SOBRESCRIBA esa matriz por rol sin necesitar un
+// deploy, y otorgar permisos puntuales a usuarios específicos. Si un rol
+// no tiene filas en RolePermission, se usa la matriz hardcodeada como
+// fallback — por eso no hace falta seed para no romper nada.
+
+model Role {
+  id              String           @id @default(uuid())
+  name            String           @unique // GERENTE, FINANZAS, OPERACIONES, AGENTE_VENTAS
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  id         String   @id @default(uuid())
+  roleId     String
+  permission String // Ej: "VIEW_CLIENTS" (clave de PERMISSIONS en config/permissions.ts)
+  createdAt  DateTime @default(now())
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@index([roleId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  id         String    @id @default(uuid())
+  userId     String
+  permission String
+  grantedBy  String?
+  grantedAt  DateTime  @default(now())
+  expiresAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@index([userId])
+  @@map("user_permissions")
+}
+
+model PermissionAudit {
+  id           String   @id @default(uuid())
+  action       String // ROLE_PERMISSIONS_UPDATED | USER_PERMISSION_GRANTED | USER_PERMISSION_REVOKED
+  roleName     String?
+  targetUserId String?
+  permission   String?
+  performedBy  String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([targetUserId])
+  @@index([roleName])
+  @@index([createdAt])
+  @@map("permission_audits")
 }
 
 model SystemConfig {

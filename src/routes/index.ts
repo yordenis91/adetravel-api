@@ -21,6 +21,7 @@ import {
   carTypesRouter, carBrandsRouter, carModelsRouter
 } from "./catalog.routes";
 import { jobsRouter } from "./jobs.routes";
+import { permissionsRouter } from "./permissions.routes";
 import { authMiddleware } from "../middlewares/auth.middleware";
 
 export const apiRouter = Router();
@@ -50,4 +51,5 @@ apiRouter.use("/car-types", carTypesRouter);
 apiRouter.use("/car-brands", carBrandsRouter);
 apiRouter.use("/car-models", carModelsRouter);
 apiRouter.use("/jobs", jobsRouter);
+apiRouter.use("/permissions", permissionsRouter);
 apiRouter.get("/search", globalSearch);

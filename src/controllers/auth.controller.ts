@@ -9,6 +9,7 @@ import { sendItem, sendError } from "../utils/response";
 import { ApiError } from "../utils/api-error";
 import { blacklistToken } from "../middlewares/auth.middleware";
 import { sendEmail } from "../services/email.service";
+import { getEffectivePermissions } from "../config/permissions";
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { email, fullName, password } = req.body as {
@@ -41,7 +42,8 @@ export async function register(req: Request, res: Response): Promise<void> {
   );
 
   const { passwordHash: _, ...userSafe } = user;
-  sendItem(res, { token, user: userSafe }, 201);
+  const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
+  sendItem(res, { token, user: { ...userSafe, permissions } }, 201);
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
@@ -83,7 +85,8 @@ export async function login(req: Request, res: Response): Promise<void> {
     );
 
     const { passwordHash, ...userSafe } = user;
-    sendItem(res, { token, user: userSafe });
+    const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
+    sendItem(res, { token, user: { ...userSafe, permissions } });
   } catch (error) {
     console.error("Error en login:", error);
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
@@ -118,7 +121,9 @@ export async function getMe(req: Request, res: Response): Promise<void> {
       throw new ApiError("Usuario no encontrado", 404, "USER_NOT_FOUND");
     }
 
-    sendItem(res, user);
+    const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
+
+    sendItem(res, { ...user, permissions });
   } catch (error) {
     console.error("Error en getMe:", error);
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
@@ -182,7 +187,9 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
       },
     });
 
-    sendItem(res, updated);
+    const permissions = await getEffectivePermissions(prisma, updated.id, updated.role, updated.agencyRole);
+
+    sendItem(res, { ...updated, permissions });
   } catch (error) {
     console.error("Error en updateMe:", error);
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
