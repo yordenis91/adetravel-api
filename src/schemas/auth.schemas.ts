@@ -19,7 +19,9 @@ export const registerSchema = z.object({
 export const updateMeSchema = z.object({
   fullName: z.string().min(3).optional(),
   phone: z.string().min(6).optional(),
-  department: z.string().min(2).optional()
+  department: z.string().min(2).optional(),
+  currentPassword: z.string().min(1).optional(),
+  newPassword: z.string().min(8).optional()
 });
 
 export const inviteSchema = z.object({
