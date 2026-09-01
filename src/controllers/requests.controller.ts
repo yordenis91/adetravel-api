@@ -7,6 +7,7 @@ import { createActivityLog } from "../services/activity-log.service";
 import { generateNumber } from "../services/numbering.service";
 import { syncServicesOnRequestStatusChange } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/requests.validator";
+import { sendTemplateEmail } from "../services/email.service";
 
 export async function listRequests(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -86,6 +87,17 @@ export async function createRequest(req: Request, res: Response): Promise<void> 
     data: { ...payload, requestNumber, createdBy: req.user!.id }
   });
   await createActivityLog({ action: "CREATE", entityType: "Request", entityId: item.id, entityLabel: item.requestNumber, performedBy: req.user?.id });
+
+  // Notificación interna al correo de la agencia (switch "Nueva solicitud" de Configuración > Email)
+  if (config?.notifyOnRequestCreated && config.agencyEmail) {
+    await sendTemplateEmail({
+      type: "REQUEST_CREATED",
+      to: config.agencyEmail,
+      fallbackSubject: `Nueva solicitud: ${item.requestNumber}`,
+      fallbackHtml: `<p>Se ha registrado una nueva solicitud con el número <strong>${item.requestNumber}</strong>.</p>`
+    }).catch(e => console.error("Error enviando notificación de nueva solicitud:", e));
+  }
+
   sendItem(res, item, 201);
 }
 

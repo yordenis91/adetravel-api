@@ -160,8 +160,11 @@ export async function changeVoucherStatus(req: Request, res: Response): Promise<
     include: { client: true, request: true, provider: true }
   });
 
-  // Envío de email si se emite
-  if (newStatus === "EMITIDO" && updated.client.email) {
+  // Envío de email si se emite (respeta el switch "Voucher emitido" de Configuración > Email)
+  const config = await prisma.systemConfig.findFirst();
+  const notifyVoucherIssued = config?.notifyOnVoucherIssued !== false;
+
+  if (newStatus === "EMITIDO" && notifyVoucherIssued && updated.client.email) {
     await sendTemplateEmail({
       type: "VOUCHER_ISSUED",
       to: updated.client.email,
