@@ -110,6 +110,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
         department: true,
         phone: true,
         isActive: true,
+        createdAt: true,
       },
     });
 
@@ -177,6 +178,7 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
         department: true,
         phone: true,
         isActive: true,
+        createdAt: true,
       },
     });
 
