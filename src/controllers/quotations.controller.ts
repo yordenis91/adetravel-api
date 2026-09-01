@@ -152,8 +152,12 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
     await advanceWorkflowStatus(existing.requestId, existing.serviceId, "ACEPTADA_POR_CLIENTE");
   }
 
-  // Envío de correo según estado
-  if (existing.client.email && ["ENVIADA", "ACEPTADA", "RECHAZADA"].includes(newStatus)) {
+  // Envío de correo según estado (respeta el switch "Cotización enviada" de Configuración > Email)
+  const config = await prisma.systemConfig.findFirst();
+  const notifyQuotationSent = config?.notifyOnQuotationSent !== false;
+  const shouldSendQuotationEmail = newStatus === "ENVIADA" ? notifyQuotationSent : true;
+
+  if (existing.client.email && shouldSendQuotationEmail && ["ENVIADA", "ACEPTADA", "RECHAZADA"].includes(newStatus)) {
     const emailTypes: Record<string, string> = {
       "ENVIADA": "QUOTATION_SENT",
       "ACEPTADA": "QUOTATION_ACCEPTED",

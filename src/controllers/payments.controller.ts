@@ -143,8 +143,11 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
     include: { client: true, request: true }
   });
 
-  // Envío de email si se completa
-  if (newStatus === "COMPLETADO" && updated.client.email) {
+  // Envío de email si se completa (respeta el switch "Pago confirmado" de Configuración > Email)
+  const config = await prisma.systemConfig.findFirst();
+  const notifyPaymentCompleted = config?.notifyOnPaymentCompleted !== false;
+
+  if (newStatus === "COMPLETADO" && notifyPaymentCompleted && updated.client.email) {
     await sendTemplateEmail({
       type: "PAYMENT_CONFIRMED",
       to: updated.client.email,
