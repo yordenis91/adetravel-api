@@ -13,6 +13,9 @@ export const usersListQuerySchema = z.object({
 });
 
 export const updateUserSchema = z.object({
+  fullName: z.string().min(3).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres").optional(),
   role: z.enum(SYSTEM_ROLES).optional(),
   agencyRole: z.enum(AGENCY_ROLES).optional().nullable(),
   isActive: z.boolean().optional(),
