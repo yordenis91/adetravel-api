@@ -30,9 +30,15 @@ app.use(
   })
 );
 
-app.get("/health", (_req, res) => {
+const healthCheck = (_req: express.Request, res: express.Response) => {
   res.json({ data: { status: "ok" } });
-});
+};
+
+// El frontend consulta ${VITE_API_URL}/health; en producción VITE_API_URL ya
+// incluye el sufijo /api, así que se registra en ambas rutas (antes del
+// authMiddleware de apiRouter) para que no requiera autenticación.
+app.get("/health", healthCheck);
+app.get("/api/health", healthCheck);
 
 app.use("/api", apiRouter);
 app.use((_req, res) => sendError(res, "Ruta no encontrada", "NOT_FOUND", 404));
