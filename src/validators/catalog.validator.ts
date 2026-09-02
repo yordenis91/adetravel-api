@@ -5,6 +5,9 @@ import { z } from "zod";
 export function catalogSchema(parentField?: string, parentRequired?: boolean) {
   const shape: Record<string, z.ZodTypeAny> = {
     name: z.string().min(1, "El nombre es obligatorio").max(200),
+    // El controller de update() lee req.body.isActive para reactivar/desactivar
+    // (ver createCatalogController); sin declararlo aquí, validate() lo descarta.
+    isActive: z.boolean().optional(),
   };
   if (parentField) {
     shape[parentField] = parentRequired
