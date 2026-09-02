@@ -22,9 +22,5 @@ RUN npm run build
 
 EXPOSE 3000
 
-# 🚧 TEMPORAL: comando de arranque inofensivo para poder abrir una terminal
-# en Easypanel y resolver manualmente la migración P3009 que quedó fallida.
-# Mantiene el contenedor vivo y responde en el puerto para no fallar el
-# health check, pero NO ejecuta `prisma migrate deploy`. Revertir a
-# `CMD ["npm", "run", "start"]` en cuanto se resuelva la migración.
-CMD ["node", "-e", "require('http').createServer((req,res)=>res.end('ok')).listen(process.env.PORT||3000)"]
+# Arrancar las migraciones automáticas y encender el servidor Express
+CMD ["npm", "run", "start"]
