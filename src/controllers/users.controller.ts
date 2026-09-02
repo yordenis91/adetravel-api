@@ -76,6 +76,16 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
     throw new ApiError("No puedes desactivar tu propia cuenta.", 403);
   }
 
+  // 3. Si cambian el email, verificar que no choque con otro usuario
+  if (updates.email) {
+    const normalizedEmail = String(updates.email).toLowerCase().trim();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing && existing.id !== targetUserId) {
+      throw new ApiError("Ya existe otro usuario con ese correo", 409, "EMAIL_ALREADY_EXISTS");
+    }
+    updates.email = normalizedEmail;
+  }
+
 // 🔥 NUEVO: Si el admin envía una nueva contraseña, la encriptamos de forma segura
   if (updates.password) {
     updates.passwordHash = await bcrypt.hash(updates.password, 12);
