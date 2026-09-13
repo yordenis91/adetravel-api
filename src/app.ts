@@ -40,16 +40,6 @@ const healthCheck = (_req: express.Request, res: express.Response) => {
 app.get("/health", healthCheck);
 app.get("/api/health", healthCheck);
 
-// TEMPORAL: solo para verificar que Sentry captura errores reales en
-// producción. Se elimina en un commit inmediato posterior a la verificación.
-app.get("/api/debug/sentry-verify-7f3a9c", (req, res, next) => {
-  if (req.query.token !== "verify-sentry-a92f61e0") {
-    sendError(res, "Ruta no encontrada", "NOT_FOUND", 404);
-    return;
-  }
-  next(new Error("Sentry backend verification test"));
-});
-
 app.use("/api", apiRouter);
 app.use((_req, res) => sendError(res, "Ruta no encontrada", "NOT_FOUND", 404));
 app.use(errorHandler);
