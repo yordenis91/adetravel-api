@@ -40,6 +40,11 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
 - Error handler global
 - Cifrado en reposo de PII sensible de Cliente (pasaporte, cuenta bancaria) — ver [`PII_ENCRYPTION.md`](./PII_ENCRYPTION.md)
 
+## Operación en producción (Easypanel)
+Arranque, apagado ordenado, health checks y cómo recuperarse de una migración
+fallida (P3009) sin tener que tocar el `CMD` del Dockerfile — ver
+[`OPERATIONS.md`](./OPERATIONS.md).
+
 ## Respuesta estandar
 - Lista paginada: `{ data, total, page, limit }`
 - Objeto: `{ data }`

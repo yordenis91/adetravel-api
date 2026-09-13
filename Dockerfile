@@ -1,6 +1,12 @@
 FROM node:22-alpine
 
-RUN apk add --no-cache openssl
+# tini como PID 1: reenvía correctamente SIGTERM al proceso real (npm no lo
+# hace de forma confiable a sus hijos) y cosecha procesos zombis. Sin esto,
+# un redeploy en Easypanel puede tardar en propagar la señal de apagado, y
+# Docker termina mandando SIGKILL de golpe — si eso ocurre a mitad de
+# `prisma migrate deploy`, la migración queda marcada como fallida (P3009)
+# y el contenedor entra en bucle de reinicio en el siguiente arranque.
+RUN apk add --no-cache openssl tini
 
 WORKDIR /app
 
@@ -21,6 +27,14 @@ COPY . .
 RUN npm run build
 
 EXPOSE 3000
+
+# --start-period generoso porque el arranque real corre `prisma migrate
+# deploy` antes de escuchar en el puerto; si hay migraciones pendientes
+# puede tardar más que un arranque en frío normal.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
 
 # Arrancar las migraciones automáticas y encender el servidor Express
 CMD ["npm", "run", "start"]
