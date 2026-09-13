@@ -1,3 +1,9 @@
+// Tipo del cliente de Prisma exportado por lib/prisma.ts (con la extensión
+// de cifrado de PII de Cliente aplicada) — no se usa el PrismaClient base
+// aquí porque las funciones de este archivo reciben el singleton ya
+// extendido, cuyo tipo ya no es estructuralmente idéntico al de la clase base.
+type PrismaLike = typeof import("../lib/prisma").prisma;
+
 // 1. Definimos todas las acciones posibles en el sistema
 export const PERMISSIONS = {
   // Usuarios
@@ -203,7 +209,7 @@ export function invalidateRolePermissionCache(): void {
   roleOverrideCache = null;
 }
 
-async function loadRoleOverrides(prisma: import("@prisma/client").PrismaClient): Promise<RolePermissionCache> {
+async function loadRoleOverrides(prisma: PrismaLike): Promise<RolePermissionCache> {
   const rows = await prisma.rolePermission.findMany({ include: { role: true } });
   const map: RolePermissionCache = {};
   for (const row of rows) {
@@ -213,7 +219,7 @@ async function loadRoleOverrides(prisma: import("@prisma/client").PrismaClient):
   return map;
 }
 
-async function getRoleOverrides(prisma: import("@prisma/client").PrismaClient): Promise<RolePermissionCache> {
+async function getRoleOverrides(prisma: PrismaLike): Promise<RolePermissionCache> {
   const now = Date.now();
   if (!roleOverrideCache || now - roleOverrideCacheAt > ROLE_CACHE_TTL_MS) {
     roleOverrideCache = await loadRoleOverrides(prisma);
@@ -228,7 +234,7 @@ async function getRoleOverrides(prisma: import("@prisma/client").PrismaClient): 
  * matriz hardcodeada de este archivo.
  */
 export async function getEffectiveRolePermissions(
-  prisma: import("@prisma/client").PrismaClient,
+  prisma: PrismaLike,
   agencyRole: string
 ): Promise<Permission[]> {
   const overrides = await getRoleOverrides(prisma);
@@ -243,7 +249,7 @@ export async function getEffectiveRolePermissions(
  * otorgados a ese usuario en particular (no vencidos).
  */
 export async function getEffectivePermissions(
-  prisma: import("@prisma/client").PrismaClient,
+  prisma: PrismaLike,
   userId: string,
   systemRole: string,
   agencyRole: string | null | undefined
@@ -267,7 +273,7 @@ export async function getEffectivePermissions(
  * permisos directos de usuario. Usada por el middleware requirePermission.
  */
 export async function hasPermissionAsync(
-  prisma: import("@prisma/client").PrismaClient,
+  prisma: PrismaLike,
   userId: string,
   systemRole: string,
   agencyRole: string | null | undefined,

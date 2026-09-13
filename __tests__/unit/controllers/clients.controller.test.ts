@@ -30,7 +30,7 @@ describe("clients.controller (PII)", () => {
   });
 
   describe("listClients", () => {
-    it("busca por texto incluyendo el número de pasaporte (PII sensible en la búsqueda)", async () => {
+    it("NO busca por número de pasaporte (queda cifrado en reposo, ya no es buscable por LIKE)", async () => {
       mockPrisma.client.findMany.mockResolvedValue([]);
       mockPrisma.client.count.mockResolvedValue(0);
       const req = buildReq({ query: { search: "P1234567" } as any });
@@ -38,9 +38,26 @@ describe("clients.controller (PII)", () => {
       await listClients(req, createMockRes());
 
       const args = mockPrisma.client.findMany.mock.calls[0][0];
-      expect(args.where.OR).toEqual(
-        expect.arrayContaining([expect.objectContaining({ passportNumber: expect.anything() })])
-      );
+      for (const clause of args.where.OR) {
+        expect(clause).not.toHaveProperty("passportNumber");
+      }
+    });
+
+    it("busca por texto en nombre, apellido, email, teléfono y RUT", async () => {
+      mockPrisma.client.findMany.mockResolvedValue([]);
+      mockPrisma.client.count.mockResolvedValue(0);
+      const req = buildReq({ query: { search: "Ana" } as any });
+
+      await listClients(req, createMockRes());
+
+      const args = mockPrisma.client.findMany.mock.calls[0][0];
+      expect(args.where.OR).toEqual([
+        { firstName: { contains: "Ana", mode: "insensitive" } },
+        { lastName: { contains: "Ana", mode: "insensitive" } },
+        { email: { contains: "Ana", mode: "insensitive" } },
+        { phone: { contains: "Ana", mode: "insensitive" } },
+        { rut: { contains: "Ana", mode: "insensitive" } },
+      ]);
     });
 
     it("filtra por isActive convirtiendo el string de query a boolean", async () => {

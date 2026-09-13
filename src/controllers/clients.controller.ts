@@ -15,13 +15,16 @@ export async function listClients(req: Request, res: Response): Promise<void> {
   const where: any = {};
 
   if (search.trim()) {
+    // passportNumber queda fuera: al cifrarse en reposo (ver
+    // client-pii-extension.ts), Postgres ya no puede hacer un LIKE parcial
+    // contra la columna (el mismo valor cifrado dos veces da un resultado
+    // distinto cada vez).
     where.OR = [
       { firstName: { contains: search, mode: "insensitive" } },
       { lastName: { contains: search, mode: "insensitive" } },
       { email: { contains: search, mode: "insensitive" } },
       { phone: { contains: search, mode: "insensitive" } },
       { rut: { contains: search, mode: "insensitive" } },
-      { passportNumber: { contains: search, mode: "insensitive" } },
     ];
   }
 

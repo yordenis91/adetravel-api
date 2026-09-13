@@ -17,6 +17,7 @@
     "seed:config": "ts-node prisma/seed-system-config.ts",
     "seed:flow": "ts-node prisma/seed-flow.ts",
     "seed:all": "npm run seed:admin && npm run seed:users && npm run seed:config && npm run seed:catalogs && npm run seed:clients && npm run seed:providers && npm run seed:flow",
+    "pii:encrypt-backfill": "ts-node prisma/scripts/encrypt-existing-client-pii.ts",
     "test": "jest --passWithNoTests"
   },
   "keywords": [
