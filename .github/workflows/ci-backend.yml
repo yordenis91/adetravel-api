@@ -11,6 +11,28 @@ jobs:
     name: Inspector de Backend
     runs-on: ubuntu-latest
 
+    # Postgres real para las migraciones y para el test e2e de pagos
+    # (__tests__/payments.e2e.test.ts), que hasta ahora nunca corría en CI.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: adetravel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgresql://test:test@localhost:5432/adetravel_test?schema=public"
+      JWT_SECRET: "ci-jwt-secret-not-for-real-use-0000000000"
+      FRONTEND_URL: "http://localhost:8080"
+
     steps:
       - name: 📥 Clonar el repositorio
         uses: actions/checkout@v4
@@ -25,12 +47,16 @@ jobs:
 
       - name: 🗄️ Generar Cliente Prisma
         run: npx prisma generate
-        env:
-          DATABASE_URL: "postgresql://dummy:5432/db?schema=public"  
+
+      - name: 🗄️ Aplicar migraciones (Postgres de CI)
+        run: npx prisma migrate deploy
 
       - name: 🔨 Construir TypeScript
         run: npm run build
-      
+
+      - name: 🧪 Ejecutar tests con cobertura
+        run: npm test -- --coverage
+
       # Solo dispara el deploy en un push real a main (mergeado), nunca en el
       # build de un Pull Request todavía sin mergear. El token vive en un
       # GitHub Secret, no en texto plano (ver README del repo / PR de rotación).
