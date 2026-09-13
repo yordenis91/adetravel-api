@@ -31,7 +31,10 @@ jobs:
       - name: 🔨 Construir TypeScript
         run: npm run build
       
+      # Solo dispara el deploy en un push real a main (mergeado), nunca en el
+      # build de un Pull Request todavía sin mergear. El token vive en un
+      # GitHub Secret, no en texto plano (ver README del repo / PR de rotación).
       - name: 🚀 Notificar a EasyPanel (despliegue Backend)
-        if: success()
+        if: github.event_name == 'push' && success()
         run: |
-          curl -X POST "http://49.13.19.148:3000/api/deploy/0a99f97345d7eb0495fd0f597dc719ac9f485c4a4427ba7e"
+          curl -X POST "${{ secrets.EASYPANEL_BACKEND_DEPLOY_HOOK }}"
