@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/node";
 import { ApiError } from "../utils/api-error";
 import { logger } from "../utils/logger";
 import { sendError } from "../utils/response";
@@ -21,5 +22,6 @@ export function errorHandler(
   }
 
   logger.error({ err }, "Unhandled error");
+  Sentry.captureException(err);
   sendError(res, "Error interno del servidor", "INTERNAL_SERVER_ERROR", 500);
 }

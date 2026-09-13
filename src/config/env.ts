@@ -13,7 +13,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
-  RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15)
+  RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15),
+  SENTRY_DSN: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
