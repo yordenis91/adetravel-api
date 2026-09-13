@@ -38,6 +38,7 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
 - Middleware de rol para endpoints de ADMIN
 - Validacion de payloads con Zod
 - Error handler global
+- Cifrado en reposo de PII sensible de Cliente (pasaporte, cuenta bancaria) — ver [`PII_ENCRYPTION.md`](./PII_ENCRYPTION.md)
 
 ## Respuesta estandar
 - Lista paginada: `{ data, total, page, limit }`

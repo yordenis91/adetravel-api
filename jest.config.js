@@ -19,7 +19,9 @@ module.exports = {
     'src/utils/response.ts',
     'src/utils/api-error.ts',
     'src/middlewares/validation.middleware.ts',
-    'src/middlewares/error-handler.middleware.ts'
+    'src/middlewares/error-handler.middleware.ts',
+    'src/lib/pii-encryption.ts',
+    'src/lib/client-pii-extension.ts'
   ],
   coverageThreshold: {
     global: {
