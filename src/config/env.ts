@@ -17,7 +17,17 @@ const envSchema = z.object({
   SENTRY_DSN: z.string().optional(),
   // Clave AES-256 (32 bytes en hex, 64 caracteres) para cifrar PII sensible
   // de Cliente (pasaporte, cuenta bancaria) en reposo. Ver src/lib/pii-encryption.ts.
-  PII_ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, "PII_ENCRYPTION_KEY debe ser un hex de 64 caracteres (32 bytes)")
+  PII_ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, "PII_ENCRYPTION_KEY debe ser un hex de 64 caracteres (32 bytes)"),
+  // Backup automático de la base a un bucket S3-compatible (ej. MinIO en Easypanel).
+  // Todos opcionales: si falta alguno, el cron de backup simplemente no se registra
+  // (ver src/jobs/index.ts) en vez de tirar abajo el arranque del servidor.
+  BACKUP_S3_ENDPOINT: z.string().url().optional(),
+  BACKUP_S3_BUCKET: z.string().min(1).optional(),
+  BACKUP_S3_REGION: z.string().min(1).default("us-east-1"),
+  BACKUP_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  BACKUP_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  BACKUP_CRON: z.string().default("0 3 * * *"),
+  BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30)
 });
 
 const parsed = envSchema.safeParse(process.env);
