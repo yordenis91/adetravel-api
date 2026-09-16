@@ -36,8 +36,16 @@ EXPOSE 3000
 # --start-period generoso porque el arranque real corre `prisma migrate
 # deploy` antes de escuchar en el puerto; si hay migraciones pendientes
 # puede tardar más que un arranque en frío normal.
+#
+# La verificación se hace con Node (el runtime que ya sabemos que está en la
+# imagen) en vez de `wget`. Producción mostraba el contenedor reiniciándose
+# cada ~100s en un patrón fijo — matemáticamente igual a start-period(45s) +
+# 3 x interval(30s) = el punto exacto en que Docker marca "unhealthy" tras 3
+# fallos seguidos. Todo indica que el propio `wget --spider` fallaba siempre
+# en esta imagen (sin relación con el estado real de la app), y Easypanel
+# reiniciaba el contenedor por eso, no por ningún problema del backend.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 ENTRYPOINT ["/sbin/tini", "--"]
 
