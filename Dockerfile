@@ -6,7 +6,12 @@ FROM node:22-alpine
 # Docker termina mandando SIGKILL de golpe — si eso ocurre a mitad de
 # `prisma migrate deploy`, la migración queda marcada como fallida (P3009)
 # y el contenedor entra en bucle de reinicio en el siguiente arranque.
-RUN apk add --no-cache openssl tini
+#
+# postgresql16-client: da el binario `pg_dump` que usa el cron de backup
+# (ver src/jobs/backupDatabase.job.ts). La versión 16 tiene que matchear la
+# versión mayor del Postgres real de producción/CI — si en algún momento se
+# sube de versión el servidor, actualizar también este paquete.
+RUN apk add --no-cache openssl tini postgresql16-client
 
 WORKDIR /app
 
