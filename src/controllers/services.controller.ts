@@ -127,9 +127,13 @@ export async function changeServiceStatus(req: Request, res: Response): Promise<
 
   await bubbleStatusToRequestIfComplete(existing.requestId, newStatus as never);
 
+  let logDescription = `Cambio de estado: ${currentStatus} -> ${newStatus}`;
+  if (notes) logDescription += ` — Nota: ${notes}`;
+  else if (cancellationReason) logDescription += ` — Motivo: ${cancellationReason}`;
+
   await createActivityLog({
     action: "UPDATE", entityType: "Service", entityId: id, entityLabel: existing.serviceNumber,
-    description: `Cambio de estado: ${currentStatus} -> ${newStatus}. ${notes || cancellationReason || ""}`,
+    description: logDescription,
     performedBy: req.user!.id
   });
 
