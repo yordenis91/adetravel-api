@@ -32,7 +32,8 @@ export async function listRequests(req: Request, res: Response): Promise<void> {
     prisma.request.findMany({ where, include: { client: true }, skip, take: limit, orderBy: { createdAt: "desc" } }),
     prisma.request.count({ where })
   ]);
-  sendList(res, data, total, page, limit);
+  const withCreators = await attachCreatorNames(data);
+  sendList(res, withCreators, total, page, limit);
 }
 
 export async function getRequest(req: Request, res: Response): Promise<void> {
@@ -42,7 +43,25 @@ export async function getRequest(req: Request, res: Response): Promise<void> {
     include: { client: true, quotations: true, payments: true, vouchers: true, servicesList: true, confirmations: true }
   });
   if (!item) throw new ApiError("Solicitud no encontrada", 404, "REQUEST_NOT_FOUND");
-  sendItem(res, item);
+  const [withCreator] = await attachCreatorNames([item]);
+  sendItem(res, withCreator);
+}
+
+// `Request.createdBy` guarda el id del usuario que la creó pero no es una relación de Prisma
+// (igual que `ActivityLog.performedBy`), así que resolvemos el nombre a mano con un solo query
+// batched en vez de traer la relación completa.
+async function attachCreatorNames<T extends { createdBy?: string | null }>(
+  items: T[]
+): Promise<(T & { createdByName: string | null })[]> {
+  const creatorIds = [...new Set(items.map((item) => item.createdBy).filter((id): id is string => !!id))];
+  const creators = creatorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: creatorIds } }, select: { id: true, fullName: true } })
+    : [];
+  const creatorMap = new Map(creators.map((c) => [c.id, c.fullName]));
+  return items.map((item) => ({
+    ...item,
+    createdByName: item.createdBy ? creatorMap.get(item.createdBy) ?? null : null
+  }));
 }
 
 export async function getRequestServices(req: Request, res: Response): Promise<void> {
