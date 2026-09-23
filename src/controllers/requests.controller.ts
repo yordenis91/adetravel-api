@@ -140,9 +140,13 @@ export async function changeRequestStatus(req: Request, res: Response): Promise<
   // los que descienden automáticamente (ver CASCADE_DOWN_STATUSES en workflow-status.ts).
   await syncServicesOnRequestStatusChange(id, newStatus, existing.isPackage);
 
+  let logDescription = `Cambio de estado: ${currentStatus} -> ${newStatus}`;
+  if (notes) logDescription += ` — Nota: ${notes}`;
+  else if (cancellationReason) logDescription += ` — Motivo: ${cancellationReason}`;
+
   await createActivityLog({
     action: "UPDATE", entityType: "Request", entityId: id, entityLabel: existing.requestNumber,
-    description: `Cambio de estado: ${currentStatus} -> ${newStatus}. ${notes || cancellationReason || ""}`,
+    description: logDescription,
     performedBy: req.user!.id
   });
 
