@@ -481,8 +481,9 @@ model Task {
   relatedEntityId    String?
   relatedEntityLabel String?
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  createdBy String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
