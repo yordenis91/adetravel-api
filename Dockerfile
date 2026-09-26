@@ -7,11 +7,16 @@ FROM node:22-alpine
 # `prisma migrate deploy`, la migración queda marcada como fallida (P3009)
 # y el contenedor entra en bucle de reinicio en el siguiente arranque.
 #
-# postgresql16-client: da el binario `pg_dump` que usa el cron de backup
-# (ver src/jobs/backupDatabase.job.ts). La versión 16 tiene que matchear la
-# versión mayor del Postgres real de producción/CI — si en algún momento se
-# sube de versión el servidor, actualizar también este paquete.
-RUN apk add --no-cache openssl tini postgresql16-client
+# postgresql17-client: da el binario `pg_dump` que usa el cron de backup
+# (ver src/jobs/backupDatabase.job.ts). pg_dump se niega a volcar un servidor
+# con una versión mayor a la suya — producción quedó con todos los backups
+# fallando en silencio ("aborting because of server version mismatch:
+# server version 17.11; pg_dump version 16.15") porque el servidor real se
+# subió a Postgres 17 y este paquete se quedó en 16. Este paquete tiene que
+# quedar siempre en la misma versión mayor que el Postgres real de
+# producción/CI — si en algún momento se sube de versión el servidor,
+# actualizar también este paquete.
+RUN apk add --no-cache openssl tini postgresql17-client
 
 WORKDIR /app
 
