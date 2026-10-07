@@ -14,6 +14,8 @@ import {
   invalidateRolePermissionCache,
 } from "../config/permissions";
 
+type DbClient = Pick<typeof prisma, "permissionAudit">;
+
 async function auditPermissionChange(data: {
   action:
     | "ROLE_PERMISSIONS_UPDATED"
@@ -26,8 +28,8 @@ async function auditPermissionChange(data: {
   permission?: string;
   performedBy: string;
   metadata?: unknown;
-}): Promise<void> {
-  await prisma.permissionAudit.create({
+}, db: DbClient = prisma): Promise<void> {
+  await db.permissionAudit.create({
     data: {
       action: data.action,
       roleName: data.roleName,
@@ -126,13 +128,15 @@ export async function getUserPermissionsDetail(req: Request, res: Response): Pro
     where: { userId },
     orderBy: { grantedAt: "desc" },
   });
-  const directGrants = overrides.filter((o) => o.effect !== "DENY");
-  const deniedPermissions = overrides.filter((o) => o.effect === "DENY");
+  const now = new Date();
+  const marked = overrides.map((o) => ({ ...o, expired: !!o.expiresAt && o.expiresAt <= now }));
+  const directGrants = marked.filter((o) => o.effect !== "DENY");
+  const deniedPermissions = marked.filter((o) => o.effect === "DENY");
 
   const effectivePermissions =
     user.role === "ADMINISTRADOR"
       ? Object.values(PERMISSIONS)
-      : applyUserOverrides(rolePermissions, overrides);
+      : applyUserOverrides(rolePermissions, overrides, now);
 
   sendItem(res, {
     userId,
@@ -165,32 +169,35 @@ export async function grantUserPermission(req: Request, res: Response): Promise<
     }
   }
 
-  const previous = await prisma.userPermission.findUnique({
-    where: { userId_permission: { userId, permission } },
-  });
+  const row = await prisma.$transaction(async (tx) => {
+    const previous = await tx.userPermission.findUnique({
+      where: { userId_permission: { userId, permission } },
+    });
 
-  if (previous?.effect === "DENY" && userId === req.user!.id) {
-    throw new ApiError("No puedes modificar una denegación que se te aplicó", 403, "CANNOT_MODIFY_OWN_DENY");
-  }
+    if (previous?.effect === "DENY" && userId === req.user!.id) {
+      throw new ApiError("No puedes modificar una denegación que se te aplicó", 403, "CANNOT_MODIFY_OWN_DENY");
+    }
 
-  const data = {
-    effect,
-    expiresAt: expiresAt ? new Date(expiresAt) : null,
-    grantedBy: req.user!.id,
-    grantedAt: new Date(),
-  };
-  const row = await prisma.userPermission.upsert({
-    where: { userId_permission: { userId, permission } },
-    update: data,
-    create: { userId, permission, ...data },
-  });
+    const data = {
+      effect,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      grantedBy: req.user!.id,
+      grantedAt: new Date(),
+    };
+    const saved = await tx.userPermission.upsert({
+      where: { userId_permission: { userId, permission } },
+      update: data,
+      create: { userId, permission, ...data },
+    });
 
-  await auditPermissionChange({
-    action: effect === "DENY" ? "USER_PERMISSION_DENIED" : "USER_PERMISSION_GRANTED",
-    targetUserId: userId,
-    permission,
-    performedBy: req.user!.id,
-    metadata: previous ? { replacedEffect: previous.effect } : undefined,
+    await auditPermissionChange({
+      action: effect === "DENY" ? "USER_PERMISSION_DENIED" : "USER_PERMISSION_GRANTED",
+      targetUserId: userId,
+      permission,
+      performedBy: req.user!.id,
+      metadata: previous ? { replacedEffect: previous.effect } : undefined,
+    }, tx);
+    return saved;
   });
 
   sendItem(res, row, 201);
@@ -200,22 +207,25 @@ export async function revokeUserPermission(req: Request, res: Response): Promise
   const userId = String(req.params.userId);
   const permission = String(req.params.permission);
 
-  const existing = await prisma.userPermission.findUnique({
-    where: { userId_permission: { userId, permission } },
-  });
-  if (!existing) throw new ApiError("El usuario no tiene una excepción para ese permiso", 404, "GRANT_NOT_FOUND");
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.userPermission.findUnique({
+      where: { userId_permission: { userId, permission } },
+    });
+    if (!existing) throw new ApiError("El usuario no tiene una excepción para ese permiso", 404, "GRANT_NOT_FOUND");
 
-  if (existing.effect === "DENY" && userId === req.user!.id) {
-    throw new ApiError("No puedes quitarte una denegación que se te aplicó", 403, "CANNOT_MODIFY_OWN_DENY");
-  }
+    if (existing.effect === "DENY" && userId === req.user!.id) {
+      throw new ApiError("No puedes quitarte una denegación que se te aplicó", 403, "CANNOT_MODIFY_OWN_DENY");
+    }
 
-  await prisma.userPermission.delete({ where: { userId_permission: { userId, permission } } });
+    await tx.userPermission.delete({ where: { userId_permission: { userId, permission } } });
 
-  await auditPermissionChange({
-    action: existing.effect === "DENY" ? "USER_PERMISSION_DENY_REMOVED" : "USER_PERMISSION_REVOKED",
-    targetUserId: userId,
-    permission,
-    performedBy: req.user!.id,
+    await auditPermissionChange({
+      action: existing.effect === "DENY" ? "USER_PERMISSION_DENY_REMOVED" : "USER_PERMISSION_REVOKED",
+      targetUserId: userId,
+      permission,
+      performedBy: req.user!.id,
+      metadata: { removedEffect: existing.effect, expiresAt: existing.expiresAt },
+    }, tx);
   });
 
   sendItem(res, { ok: true });
