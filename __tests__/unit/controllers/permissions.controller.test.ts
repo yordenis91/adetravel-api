@@ -6,6 +6,7 @@ const mockPrisma = {
   userPermission: { findUnique: jest.fn(), findMany: jest.fn(), upsert: jest.fn(), delete: jest.fn() },
   rolePermission: { findMany: jest.fn() },
   permissionAudit: { create: jest.fn() },
+  $transaction: jest.fn(),
 };
 jest.mock("../../../src/lib/prisma", () => ({ prisma: mockPrisma }));
 
@@ -28,6 +29,7 @@ describe("permissions.controller (denegaciones por usuario)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     invalidateRolePermissionCache();
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
     mockPrisma.rolePermission.findMany.mockResolvedValue([]);
     mockPrisma.userPermission.findMany.mockResolvedValue([]);
     mockPrisma.userPermission.findUnique.mockResolvedValue(null);
@@ -71,6 +73,18 @@ describe("permissions.controller (denegaciones por usuario)", () => {
       expect(mockPrisma.userPermission.upsert).not.toHaveBeenCalled();
     });
 
+    it("no permite que un usuario pise una denegación que se le aplicó", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: "gerente-1", role: "USUARIO", agencyRole: "GERENTE" });
+      mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY" });
+      await expect(
+        grantUserPermission(
+          req({ params: { userId: "gerente-1" } as any, body: { permission: "MANAGE_SERVICES" }, user: { id: "gerente-1", role: "USUARIO" } as any }),
+          createMockRes()
+        )
+      ).rejects.toMatchObject({ statusCode: 403, code: "CANNOT_MODIFY_OWN_DENY" });
+      expect(mockPrisma.userPermission.upsert).not.toHaveBeenCalled();
+    });
+
     it("otorgar sobre una denegación existente la reemplaza y lo deja en la auditoría", async () => {
       mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY" });
       await grantUserPermission(req({ body: { permission: "MANAGE_SERVICES" } }), createMockRes());
@@ -96,6 +110,14 @@ describe("permissions.controller (denegaciones por usuario)", () => {
       expect(auditedActions()).toEqual(["USER_PERMISSION_DENY_REMOVED"]);
     });
 
+    it("no permite quitarse a uno mismo una denegación", async () => {
+      mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY" });
+      await expect(
+        revokeUserPermission(req({ params: { userId: "gerente-1", permission: "MANAGE_SERVICES" } as any, user: { id: "gerente-1", role: "USUARIO" } as any }), createMockRes())
+      ).rejects.toMatchObject({ statusCode: 403, code: "CANNOT_MODIFY_OWN_DENY" });
+      expect(mockPrisma.userPermission.delete).not.toHaveBeenCalled();
+    });
+
     it("quitar una excepción otorgada sigue auditando USER_PERMISSION_REVOKED", async () => {
       mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "GRANT" });
       await revokeUserPermission(req({ params }), createMockRes());
@@ -105,6 +127,22 @@ describe("permissions.controller (denegaciones por usuario)", () => {
     it("404 si no hay excepción para ese permiso", async () => {
       await expect(revokeUserPermission(req({ params }), createMockRes())).rejects.toMatchObject({ statusCode: 404 });
       expect(mockPrisma.userPermission.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("atomicidad", () => {
+    it("si falla la auditoría la transacción se propaga como error (no queda cambio sin registro)", async () => {
+      mockPrisma.permissionAudit.create.mockRejectedValueOnce(new Error("db"));
+      await expect(
+        grantUserPermission(req({ body: { permission: "MANAGE_SERVICES", effect: "DENY" } }), createMockRes())
+      ).rejects.toThrow("db");
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("el audit de una revocación registra el efecto removido", async () => {
+      mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY", expiresAt: null });
+      await revokeUserPermission(req({ params: { userId: TARGET, permission: "MANAGE_SERVICES" } as any }), createMockRes());
+      expect(mockPrisma.permissionAudit.create.mock.calls[0][0].data.metadata).toMatchObject({ removedEffect: "DENY" });
     });
   });
 
@@ -132,6 +170,7 @@ describe("permissions.controller (denegaciones por usuario)", () => {
       await getUserPermissionsDetail(req({}), res);
       const body = res.json.mock.calls[0][0].data;
       expect(body.deniedPermissions).toHaveLength(1);
+      expect(body.deniedPermissions[0].expired).toBe(true);
       expect(body.effectivePermissions).toContain("MANAGE_SERVICES");
     });
   });

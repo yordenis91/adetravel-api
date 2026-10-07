@@ -23,6 +23,11 @@ describe("applyUserOverrides", () => {
     expect(applyUserOverrides(role, [], NOW).sort()).toEqual([...role].sort());
   });
 
+  it("un effect desconocido falla cerrado: se trata como denegación", () => {
+    const r = applyUserOverrides(role, [{ permission: "MANAGE_SERVICES", effect: "BLOCK" }], NOW);
+    expect(r).not.toContain("MANAGE_SERVICES");
+  });
+
   it("GRANT suma un permiso que el rol no tiene", () => {
     const r = applyUserOverrides(role, [{ permission: "VIEW_PAYMENTS", effect: "GRANT" }], NOW);
     expect(r).toContain("VIEW_PAYMENTS");

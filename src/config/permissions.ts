@@ -259,8 +259,10 @@ export function applyUserOverrides(
   now: Date = new Date()
 ): Permission[] {
   const active = rows.filter((r) => !r.expiresAt || r.expiresAt > now);
-  const denied = new Set(active.filter((r) => r.effect === "DENY").map((r) => r.permission));
-  const granted = active.filter((r) => r.effect !== "DENY").map((r) => r.permission);
+  // Falla cerrado: solo null/undefined/"GRANT" suman; cualquier otro valor se trata como DENY.
+  const isGrant = (r: UserPermissionRow) => r.effect == null || r.effect === "GRANT";
+  const denied = new Set(active.filter((r) => !isGrant(r)).map((r) => r.permission));
+  const granted = active.filter(isGrant).map((r) => r.permission);
   return Array.from(new Set([...rolePermissions, ...granted])).filter(
     (p) => !denied.has(p)
   ) as Permission[];
