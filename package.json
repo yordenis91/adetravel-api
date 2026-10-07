@@ -20,7 +20,8 @@
     "pii:encrypt-backfill": "ts-node prisma/scripts/encrypt-existing-client-pii.ts",
     "smtp:encrypt-password": "ts-node prisma/scripts/encrypt-smtp-password.ts",
     "test": "jest --passWithNoTests",
-    "test:e2e": "bash scripts/test-e2e.sh"
+    "test:e2e": "bash scripts/test-e2e.sh",
+    "restore:drill": "bash scripts/restore-drill.sh"
   },
   "keywords": [
     "node",
