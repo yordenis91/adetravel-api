@@ -102,3 +102,17 @@ No hay soporte automático todavía. Para rotar `PII_ENCRYPTION_KEY`:
    claves disponibles y migrar campo por campo.
 2. Este es un procedimiento delicado — coordinar antes de intentarlo en
    producción.
+
+## Contraseña del SMTP
+
+`SystemConfig.smtpPassword` se guarda cifrada con la misma `PII_ENCRYPTION_KEY` y nunca sale de la API:
+`GET`/`PUT /system-config` devuelven `smtpPasswordSet: true|false` en su lugar. Al guardar, una
+contraseña vacía o ausente conserva la actual y `null` la borra. `email.service` la descifra al enviar
+(una contraseña antigua aún en texto plano también funciona).
+
+Para cifrar una contraseña guardada antes de este cambio (seguro de re-ejecutar):
+
+```bash
+npm run smtp:encrypt-password -- --dry-run
+npm run smtp:encrypt-password
+```

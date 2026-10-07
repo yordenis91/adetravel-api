@@ -2,19 +2,46 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem } from "../utils/response";
 import { createActivityLog } from "../services/activity-log.service";
+import { encryptPII } from "../lib/pii-encryption";
 import axios from "axios";
 import https from "https"; // Librería nativa de Node
 
+/**
+ * La contraseña del SMTP nunca sale de la API: se guarda cifrada (misma clave que la PII de
+ * clientes) y las respuestas solo dicen si hay una configurada. El Dashboard pide esta
+ * configuración para las tasas de cambio, así que antes la contraseña viajaba al navegador.
+ */
+export function toPublicConfig<T extends { smtpPassword?: string | null }>(config: T | null) {
+  if (!config) return {};
+  const { smtpPassword, ...rest } = config;
+  return { ...rest, smtpPasswordSet: !!smtpPassword };
+}
+
+/**
+ * Normaliza la contraseña recibida: vacía o ausente = conservar la actual (la UI no la conoce);
+ * null = borrarla; texto = guardarla cifrada.
+ */
+export function smtpPasswordUpdate(body: Record<string, unknown>): { set: boolean; value?: string | null } {
+  if (!("smtpPassword" in body)) return { set: false };
+  const value = body.smtpPassword;
+  if (value === null) return { set: true, value: null };
+  if (typeof value !== "string" || value === "") return { set: false };
+  return { set: true, value: encryptPII(value) };
+}
+
 export async function getSystemConfig(_req: Request, res: Response): Promise<void> {
   const config = await prisma.systemConfig.findFirst();
-  sendItem(res, config ?? {});
+  sendItem(res, toPublicConfig(config));
 }
 
 export async function upsertSystemConfig(req: Request, res: Response): Promise<void> {
   const existing = await prisma.systemConfig.findFirst();
+  const { smtpPassword: _ignored, smtpPasswordSet: _readOnly, ...data } = req.body as Record<string, unknown>;
+  const password = smtpPasswordUpdate(req.body as Record<string, unknown>);
+  if (password.set) data.smtpPassword = password.value;
   const config = existing
-    ? await prisma.systemConfig.update({ where: { id: existing.id }, data: req.body as any })
-    : await prisma.systemConfig.create({ data: req.body as any });
+    ? await prisma.systemConfig.update({ where: { id: existing.id }, data: data as any })
+    : await prisma.systemConfig.create({ data: data as any });
 
   await createActivityLog({
     action: existing ? "UPDATE" : "CREATE",
@@ -24,7 +51,7 @@ export async function upsertSystemConfig(req: Request, res: Response): Promise<v
     performedBy: req.user?.id
   });
 
-  sendItem(res, config);
+  sendItem(res, toPublicConfig(config));
 }
 
 export async function syncExchangeRates(req: Request, res: Response): Promise<void> {
@@ -110,7 +137,7 @@ export async function syncExchangeRates(req: Request, res: Response): Promise<vo
       performedBy: req.user?.id
     });
 
-    sendItem(res, config);
+    sendItem(res, toPublicConfig(config));
   } catch (error: any) {
     console.error("Error crítico de Sincronización:", error?.response?.data || error.message);
     res.status(500).json({ 
