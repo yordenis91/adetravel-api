@@ -23,6 +23,11 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  // Salvaguarda de correo por entorno. "live": se envía a los destinatarios reales (producción).
+  // "redirect": todo va a EMAIL_REDIRECT_TO, con el destinatario original en el asunto (demo y
+  // pruebas con datos que pueden ser reales). "off": no se envía nada, solo se registra.
+  EMAIL_DELIVERY: z.enum(["live", "redirect", "off"]).default("live"),
+  EMAIL_REDIRECT_TO: z.string().email().optional(),
   SENTRY_DSN: z.string().optional(),
   // Clave AES-256 (32 bytes en hex, 64 caracteres) para cifrar PII sensible
   // de Cliente (pasaporte, cuenta bancaria) en reposo. Ver src/lib/pii-encryption.ts.
@@ -42,6 +47,9 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   throw new Error(`Invalid environment variables: ${parsed.error.message}`);
+}
+if (parsed.data.EMAIL_DELIVERY === "redirect" && !parsed.data.EMAIL_REDIRECT_TO) {
+  throw new Error("Invalid environment variables: EMAIL_DELIVERY=redirect exige EMAIL_REDIRECT_TO");
 }
 
 export const env = parsed.data;
