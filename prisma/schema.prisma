@@ -96,6 +96,8 @@ model User {
   isActive             Boolean        @default(true)
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
+  /// Se incrementa al cambiar o restablecer la contraseña: invalida los tokens emitidos antes.
+  tokenVersion         Int            @default(0)
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   tasks                Task[]
@@ -103,6 +105,15 @@ model User {
   userPermissions      UserPermission[]
 
   @@map("users")
+}
+
+/// Tokens cerrados con logout (por jti) hasta que caducan. Persistido para que sobreviva a los despliegues.
+model RevokedToken {
+  jti       String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@map("revoked_tokens")
 }
 
 model Client {

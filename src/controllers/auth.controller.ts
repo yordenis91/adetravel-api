@@ -8,6 +8,7 @@ import { env } from "../config/env";
 import { sendItem, sendError } from "../utils/response";
 import { ApiError } from "../utils/api-error";
 import { blacklistToken } from "../middlewares/auth.middleware";
+import { revokeToken, signAccessToken } from "../lib/auth-tokens";
 import { sendEmail } from "../services/email.service";
 import { getEffectivePermissions } from "../config/permissions";
 import { logger } from "../utils/logger";
@@ -45,11 +46,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     },
   });
 
-  const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    env.JWT_SECRET as jwt.Secret,
-    { expiresIn: env.JWT_EXPIRES_IN || "7d" } as jwt.SignOptions
-  );
+  const token = signAccessToken(user);
 
   const { passwordHash: _, ...userSafe } = user;
   const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
@@ -84,15 +81,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      env.JWT_SECRET as jwt.Secret,
-      { expiresIn: env.JWT_EXPIRES_IN || "7d" } as jwt.SignOptions
-    );
+    const token = signAccessToken(user);
 
     const { passwordHash, ...userSafe } = user;
     const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
@@ -105,7 +94,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 export async function logout(req: Request, res: Response): Promise<void> {
   const token = req.headers.authorization?.replace("Bearer ", "");
-  if (token) blacklistToken(token);
+  if (token) {
+    // authMiddleware ya verificó la firma; aquí solo se lee el jti y la caducidad.
+    const payload = jwt.decode(token) as jwt.JwtPayload | null;
+    const revoked = payload ? await revokeToken(payload) : false;
+    // Tokens emitidos antes del jti: solo se pueden recordar en memoria.
+    if (!revoked) blacklistToken(token);
+  }
   sendItem(res, { ok: true });
 }
 
@@ -180,6 +175,9 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
       }
 
       updateData.passwordHash = await bcrypt.hash(newPassword, 12);
+      // Invalida todas las sesiones abiertas con la contraseña anterior (también la actual):
+      // la respuesta trae un token nuevo para seguir trabajando sin volver a iniciar sesión.
+      updateData.tokenVersion = { increment: 1 };
     }
 
     const updated = await prisma.user.update({
@@ -195,12 +193,15 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
         phone: true,
         isActive: true,
         createdAt: true,
+        tokenVersion: true,
       },
     });
 
     const permissions = await getEffectivePermissions(prisma, updated.id, updated.role, updated.agencyRole);
+    const { tokenVersion, ...profile } = updated;
+    const token = newPassword ? signAccessToken({ ...updated, tokenVersion }) : undefined;
 
-    sendItem(res, { ...updated, permissions });
+    sendItem(res, { ...profile, permissions, ...(token ? { token } : {}) });
   } catch (error) {
     logger.error({ err: error }, "Error en updateMe");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
@@ -483,6 +484,8 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
         passwordHash,
         resetPasswordToken: null,
         resetPasswordExpires: null,
+        // Quien pidió el reset puede sospechar de un acceso ajeno: se cierran todas las sesiones.
+        tokenVersion: { increment: 1 },
       },
     });
 
