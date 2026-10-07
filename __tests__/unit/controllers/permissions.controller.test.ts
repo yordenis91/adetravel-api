@@ -6,6 +6,7 @@ const mockPrisma = {
   userPermission: { findUnique: jest.fn(), findMany: jest.fn(), upsert: jest.fn(), delete: jest.fn() },
   rolePermission: { findMany: jest.fn() },
   permissionAudit: { create: jest.fn() },
+  $transaction: jest.fn(),
 };
 jest.mock("../../../src/lib/prisma", () => ({ prisma: mockPrisma }));
 
@@ -28,6 +29,7 @@ describe("permissions.controller (denegaciones por usuario)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     invalidateRolePermissionCache();
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
     mockPrisma.rolePermission.findMany.mockResolvedValue([]);
     mockPrisma.userPermission.findMany.mockResolvedValue([]);
     mockPrisma.userPermission.findUnique.mockResolvedValue(null);
@@ -128,6 +130,22 @@ describe("permissions.controller (denegaciones por usuario)", () => {
     });
   });
 
+  describe("atomicidad", () => {
+    it("si falla la auditoría la transacción se propaga como error (no queda cambio sin registro)", async () => {
+      mockPrisma.permissionAudit.create.mockRejectedValueOnce(new Error("db"));
+      await expect(
+        grantUserPermission(req({ body: { permission: "MANAGE_SERVICES", effect: "DENY" } }), createMockRes())
+      ).rejects.toThrow("db");
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("el audit de una revocación registra el efecto removido", async () => {
+      mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY", expiresAt: null });
+      await revokeUserPermission(req({ params: { userId: TARGET, permission: "MANAGE_SERVICES" } as any }), createMockRes());
+      expect(mockPrisma.permissionAudit.create.mock.calls[0][0].data.metadata).toMatchObject({ removedEffect: "DENY" });
+    });
+  });
+
   describe("getUserPermissionsDetail", () => {
     it("separa otorgados y denegados y excluye lo denegado de los efectivos", async () => {
       mockPrisma.userPermission.findMany.mockResolvedValue([
@@ -152,6 +170,7 @@ describe("permissions.controller (denegaciones por usuario)", () => {
       await getUserPermissionsDetail(req({}), res);
       const body = res.json.mock.calls[0][0].data;
       expect(body.deniedPermissions).toHaveLength(1);
+      expect(body.deniedPermissions[0].expired).toBe(true);
       expect(body.effectivePermissions).toContain("MANAGE_SERVICES");
     });
   });
