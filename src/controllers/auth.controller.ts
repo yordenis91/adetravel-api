@@ -10,8 +10,18 @@ import { ApiError } from "../utils/api-error";
 import { blacklistToken } from "../middlewares/auth.middleware";
 import { sendEmail } from "../services/email.service";
 import { getEffectivePermissions } from "../config/permissions";
+import { logger } from "../utils/logger";
+import { passwordPolicyIssue } from "../utils/password-policy";
 
 export async function register(req: Request, res: Response): Promise<void> {
+  if (!env.ALLOW_PUBLIC_REGISTRATION) {
+    throw new ApiError(
+      "El registro público está deshabilitado. Pide una invitación a tu administrador.",
+      403,
+      "REGISTRATION_DISABLED"
+    );
+  }
+
   const { email, fullName, password } = req.body as {
     email: string;
     fullName: string;
@@ -88,7 +98,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
     sendItem(res, { token, user: { ...userSafe, permissions } });
   } catch (error) {
-    console.error("Error en login:", error);
+    logger.error({ err: error }, "Error en login");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
   }
 }
@@ -125,7 +135,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 
     sendItem(res, { ...user, permissions });
   } catch (error) {
-    console.error("Error en getMe:", error);
+    logger.error({ err: error }, "Error en getMe");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
   }
 }
@@ -163,8 +173,9 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
         return;
       }
 
-      if (newPassword.length < 8) {
-        sendError(res, "La nueva contraseña debe tener al menos 8 caracteres", "PASSWORD_TOO_SHORT", 400);
+      const policyIssue = passwordPolicyIssue(newPassword);
+      if (policyIssue) {
+        sendError(res, policyIssue, "WEAK_PASSWORD", 400);
         return;
       }
 
@@ -191,7 +202,7 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
 
     sendItem(res, { ...updated, permissions });
   } catch (error) {
-    console.error("Error en updateMe:", error);
+    logger.error({ err: error }, "Error en updateMe");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
   }
 }
@@ -206,21 +217,71 @@ export async function inviteUser(req: Request, res: Response): Promise<void> {
     password: string;
   };
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // El login busca por email en minúsculas, así que se guarda igual aquí.
+  const normalizedEmail = email.toLowerCase().trim();
+
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) throw new ApiError("El usuario ya existe", 409, "USER_ALREADY_EXISTS");
 
   const hash = await bcrypt.hash(password, 10);
+
+  // Enlace de un solo uso para que la persona invitada defina su propia contraseña
+  // (la que puso quien invita queda como respaldo, no se envía por correo).
+  const inviteToken = generateResetToken();
+  const inviteExpires = new Date(Date.now() + INVITE_LINK_TTL_MS);
+
   const user = await prisma.user.create({
-    data: { email, fullName, role, agencyRole, passwordHash: hash, createdAt: new Date(), updatedAt: new Date() },
+    data: {
+      email: normalizedEmail,
+      fullName,
+      role,
+      agencyRole,
+      passwordHash: hash,
+      resetPasswordToken: hashResetToken(inviteToken),
+      resetPasswordExpires: inviteExpires,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   });
 
-  await sendEmail({
-    to: email,
-    subject: "Invitación AdeTravel",
-    html: `<p>Hola ${fullName}, tu usuario fue creado en AdeTravel.</p>`,
-  });
+  // Si el SMTP falla o no está configurado, el usuario ya existe: se avisa en la
+  // respuesta en vez de devolver un 500 que lo deja creado a medias.
+  let emailSent = false;
+  try {
+    const link = `${env.FRONTEND_URL}/auth/reset-password/${inviteToken}`;
+    await sendEmail({
+      to: normalizedEmail,
+      subject: "Invitación a AdeTravel",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #0A1128;">ADE Travel</h1>
+          <p>Hola ${escapeHtml(fullName)}, te crearon un usuario en AdeTravel.</p>
+          <p>Define tu contraseña desde este enlace (vence en 7 días):</p>
+          <p><a href="${link}" style="background: #0A1128; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Crear mi contraseña</a></p>
+          <p style="color: #666; font-size: 12px;">Si el botón no funciona, copia este enlace: ${link}</p>
+          <p style="color: #666; font-size: 12px;">Tu usuario de acceso es ${escapeHtml(normalizedEmail)}.</p>
+        </div>`,
+    });
+    emailSent = true;
+  } catch (emailError) {
+    logger.error({ err: emailError, userId: user.id }, "No se pudo enviar el correo de invitación");
+  }
 
-  sendItem(res, { id: user.id, email: user.email, fullName: user.fullName, role: user.role }, 201);
+  sendItem(
+    res,
+    { id: user.id, email: user.email, fullName: user.fullName, role: user.role, emailSent },
+    201
+  );
+}
+
+const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // 🔐 Función auxiliar para generar un token seguro de recuperación
@@ -319,7 +380,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
           `,
         });
       } catch (emailError) {
-        console.error("Error enviando email de recuperación:", emailError);
+        logger.error({ err: emailError }, "Error enviando email de recuperación");
         // No revelar el error al usuario por seguridad
       }
     }
@@ -330,7 +391,7 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       message: "Si el correo existe en nuestro sistema, recibirás instrucciones para recuperar tu contraseña.",
     });
   } catch (error) {
-    console.error("Error en forgotPassword:", error);
+    logger.error({ err: error }, "Error en forgotPassword");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
   }
 }
@@ -368,7 +429,7 @@ export async function validateResetToken(req: Request, res: Response): Promise<v
 
     sendItem(res, { valid: true });
   } catch (error) {
-    console.error("Error en validateResetToken:", error);
+    logger.error({ err: error }, "Error en validateResetToken");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
   }
 }
@@ -388,24 +449,10 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // 🛡️ Validar requisitos mínimos de contraseña
-    if (newPassword.length < 8) {
-      sendError(res, "La contraseña debe tener al menos 8 caracteres", "WEAK_PASSWORD", 400);
-      return;
-    }
-
-    if (!/[A-Z]/.test(newPassword)) {
-      sendError(res, "La contraseña debe incluir al menos una letra mayúscula", "WEAK_PASSWORD", 400);
-      return;
-    }
-
-    if (!/[0-9]/.test(newPassword)) {
-      sendError(res, "La contraseña debe incluir al menos un número", "WEAK_PASSWORD", 400);
-      return;
-    }
-
-    if (!/[!@#$%^&*]/.test(newPassword)) {
-      sendError(res, "La contraseña debe incluir al menos un carácter especial (!@#$%^&*)", "WEAK_PASSWORD", 400);
+    // 🛡️ Validar requisitos de contraseña (política única en utils/password-policy)
+    const policyIssue = passwordPolicyIssue(newPassword);
+    if (policyIssue) {
+      sendError(res, policyIssue, "WEAK_PASSWORD", 400);
       return;
     }
 
@@ -444,7 +491,7 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
       message: "Tu contraseña ha sido restablecida correctamente.",
     });
   } catch (error) {
-    console.error("Error en resetPassword:", error);
+    logger.error({ err: error }, "Error en resetPassword");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
   }
 }

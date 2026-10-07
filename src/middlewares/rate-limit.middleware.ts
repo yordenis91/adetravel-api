@@ -1,5 +1,24 @@
-import rateLimit from "express-rate-limit";
+import { Request } from "express";
+import jwt from "jsonwebtoken";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { env } from "../config/env";
+
+// Clave del limitador global. Una agencia entera suele salir por una sola IP de
+// oficina, así que contar por IP hace que todo el equipo comparta un mismo cupo y
+// reciba 429 a la vez. Con un token válido se cuenta por usuario; sin token (o con
+// uno inválido) se sigue contando por IP, así que mandar tokens falsos no evade el límite.
+export function apiRateLimitKey(req: Request): string {
+  const header = req.headers.authorization;
+  if (header?.startsWith("Bearer ")) {
+    try {
+      const decoded = jwt.verify(header.slice(7), env.JWT_SECRET) as jwt.JwtPayload;
+      if (typeof decoded.id === "string") return `user:${decoded.id}`;
+    } catch {
+      // token inválido o expirado: cae al conteo por IP
+    }
+  }
+  return `ip:${ipKeyGenerator(req.ip ?? "")}`;
+}
 
 // Rate limit para login: solo cuentan los intentos fallidos (skipSuccessfulRequests),
 // así el uso normal no se bloquea pero la fuerza bruta de contraseñas sí.

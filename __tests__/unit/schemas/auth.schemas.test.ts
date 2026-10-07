@@ -19,7 +19,7 @@ describe("auth.schemas", () => {
         registerSchema.parse({
           fullName: "Ana Pérez",
           email: "ana@example.com",
-          password: "password123",
+          password: "Password123!",
           confirmPassword: "otraCosa123",
         })
       ).toThrow();
@@ -30,8 +30,8 @@ describe("auth.schemas", () => {
         registerSchema.parse({
           fullName: "Ana Pérez",
           email: "ana@example.com",
-          password: "password123",
-          confirmPassword: "password123",
+          password: "Password123!",
+          confirmPassword: "Password123!",
         })
       ).not.toThrow();
     });
@@ -44,10 +44,10 @@ describe("auth.schemas", () => {
     it("declara currentPassword y newPassword (regresión del bug de cambio de contraseña)", () => {
       const result = updateMeSchema.parse({
         currentPassword: "actual123",
-        newPassword: "nuevaPassword123",
+        newPassword: "NuevaPassword123!",
       });
       expect(result.currentPassword).toBe("actual123");
-      expect(result.newPassword).toBe("nuevaPassword123");
+      expect(result.newPassword).toBe("NuevaPassword123!");
     });
 
     it("permite actualizar solo datos personales sin tocar la contraseña", () => {
@@ -58,6 +58,13 @@ describe("auth.schemas", () => {
     it("rechaza una newPassword menor a 8 caracteres", () => {
       expect(() => updateMeSchema.parse({ newPassword: "corta" })).toThrow();
     });
+
+    it.each(["sinmayuscula1!", "SinNumero!!", "SinSimbolo123"])(
+      "rechaza %s por no cumplir la política de contraseñas",
+      (newPassword) => {
+        expect(() => updateMeSchema.parse({ newPassword })).toThrow();
+      }
+    );
   });
 
   describe("inviteSchema", () => {
@@ -67,7 +74,7 @@ describe("auth.schemas", () => {
           email: "nuevo@example.com",
           fullName: "Nuevo Usuario",
           role: "USUARIO",
-          password: "password123",
+          password: "Password123!",
         })
       ).not.toThrow();
     });

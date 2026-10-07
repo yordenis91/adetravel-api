@@ -9,6 +9,7 @@ import { errorHandler } from "./middlewares/error-handler.middleware";
 import { sendError } from "./utils/response";
 import { prisma } from "./lib/prisma";
 import { logger } from "./utils/logger";
+import { apiRateLimitKey } from "./middlewares/rate-limit.middleware";
 
 export const app = express();
 
@@ -56,6 +57,7 @@ app.use(
     max: env.RATE_LIMIT_MAX,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: apiRateLimitKey,
     // El login tiene su propio límite (loginLimiter, solo intentos fallidos). Si además
     // consumiera este cupo, el polling del cliente lo agotaría y el login daría 429.
     skip: (req) => req.method === "POST" && req.path === "/api/auth/login"

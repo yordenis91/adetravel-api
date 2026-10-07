@@ -17,6 +17,12 @@ const envSchema = z.object({
   // Límite propio de /auth/login: solo cuenta intentos fallidos por IP.
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(10),
   LOGIN_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15),
+  // El registro público (POST /auth/register) queda apagado salvo que se active
+  // explícitamente: en producción los usuarios entran por invitación (/auth/invite).
+  ALLOW_PUBLIC_REGISTRATION: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   SENTRY_DSN: z.string().optional(),
   // Clave AES-256 (32 bytes en hex, 64 caracteres) para cifrar PII sensible
   // de Cliente (pasaporte, cuenta bancaria) en reposo. Ver src/lib/pii-encryption.ts.
