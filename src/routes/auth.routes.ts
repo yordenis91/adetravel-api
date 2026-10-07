@@ -17,6 +17,7 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 // 🔥 Importamos el nuevo middleware
 import { requirePermission } from "../middlewares/permission.middleware";
 import { 
+  loginLimiter,
   forgotPasswordLimiter, 
   resetPasswordLimiter, 
   validateTokenLimiter 
@@ -26,7 +27,7 @@ export const authRouter = Router();
 
 // Rutas públicas / de sesión
 authRouter.post("/register", validate(registerSchema), asyncHandler(register));
-authRouter.post("/login", validate(loginSchema), asyncHandler(login));
+authRouter.post("/login", loginLimiter, validate(loginSchema), asyncHandler(login));
 authRouter.post("/logout", authMiddleware, asyncHandler(logout));
 
 // Perfil propio (Cualquier usuario autenticado puede acceder)
@@ -45,4 +46,4 @@ authRouter.post(
 // 🔐 Recuperación de contraseña (Rutas públicas con Rate Limiting)
 authRouter.post("/forgot-password", forgotPasswordLimiter, asyncHandler(forgotPassword));
 authRouter.post("/validate-reset-token", validateTokenLimiter, asyncHandler(validateResetToken));
-authRouter.post("/reset-password", resetPasswordLimiter, asyncHandler(resetPassword));
+authRouter.post("/reset-password", resetPasswordLimiter, asyncHandler(resetPassword));

@@ -55,7 +55,10 @@ app.use(
     windowMs: env.RATE_LIMIT_WINDOW_MINUTES * 60 * 1000,
     max: env.RATE_LIMIT_MAX,
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    // El login tiene su propio límite (loginLimiter, solo intentos fallidos). Si además
+    // consumiera este cupo, el polling del cliente lo agotaría y el login daría 429.
+    skip: (req) => req.method === "POST" && req.path === "/api/auth/login"
   })
 );
 

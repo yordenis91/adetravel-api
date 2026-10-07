@@ -1,4 +1,16 @@
 import rateLimit from "express-rate-limit";
+import { env } from "../config/env";
+
+// Rate limit para login: solo cuentan los intentos fallidos (skipSuccessfulRequests),
+// así el uso normal no se bloquea pero la fuerza bruta de contraseñas sí.
+export const loginLimiter = rateLimit({
+  windowMs: env.LOGIN_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000,
+  max: env.LOGIN_RATE_LIMIT_MAX,
+  message: "Demasiados intentos de inicio de sesión. Por favor, intenta de nuevo más tarde.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+});
 
 // Rate limit para forgot-password: máximo 5 solicitudes por hora por IP
 export const forgotPasswordLimiter = rateLimit({
