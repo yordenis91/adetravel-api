@@ -243,10 +243,33 @@ export async function getEffectiveRolePermissions(
   return AGENCY_ROLE_PERMISSIONS[agencyRole] ?? [];
 }
 
+interface UserPermissionRow {
+  permission: string;
+  effect?: string | null;
+  expiresAt?: Date | null;
+}
+
+/**
+ * (permisos del rol ∪ excepciones GRANT vigentes) − excepciones DENY vigentes.
+ * La denegación siempre gana, también sobre un GRANT del mismo permiso.
+ */
+export function applyUserOverrides(
+  rolePermissions: readonly string[],
+  rows: readonly UserPermissionRow[],
+  now: Date = new Date()
+): Permission[] {
+  const active = rows.filter((r) => !r.expiresAt || r.expiresAt > now);
+  const denied = new Set(active.filter((r) => r.effect === "DENY").map((r) => r.permission));
+  const granted = active.filter((r) => r.effect !== "DENY").map((r) => r.permission);
+  return Array.from(new Set([...rolePermissions, ...granted])).filter(
+    (p) => !denied.has(p)
+  ) as Permission[];
+}
+
 /**
  * Permisos efectivos de un usuario: ADMINISTRADOR = todos; si no, permisos
- * de su rol de agencia (con override de BD si existe) + permisos directos
- * otorgados a ese usuario en particular (no vencidos).
+ * de su rol de agencia (con override de BD si existe) más sus excepciones
+ * individuales vigentes, GRANT suma y DENY quita (ver applyUserOverrides).
  */
 export async function getEffectivePermissions(
   prisma: PrismaLike,
@@ -258,14 +281,14 @@ export async function getEffectivePermissions(
 
   const rolePerms = agencyRole ? await getEffectiveRolePermissions(prisma, agencyRole) : [];
 
-  const directGrants = await prisma.userPermission.findMany({
+  const overrides = await prisma.userPermission.findMany({
     where: {
       userId,
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
   });
 
-  return Array.from(new Set([...rolePerms, ...directGrants.map(g => g.permission as Permission)]));
+  return applyUserOverrides(rolePerms, overrides);
 }
 
 /**

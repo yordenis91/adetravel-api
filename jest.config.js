@@ -11,6 +11,9 @@ module.exports = {
   collectCoverageFrom: [
     'src/controllers/payments.controller.ts',
     'src/controllers/clients.controller.ts',
+    'src/controllers/permissions.controller.ts',
+    'src/config/permissions.ts',
+    'src/validators/permissions.validator.ts',
     'src/validators/payments.validator.ts',
     'src/validators/clients.validator.ts',
     'src/validators/users.validator.ts',
