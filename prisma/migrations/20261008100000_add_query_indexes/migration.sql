@@ -1,3 +1,6 @@
+-- Envuelta en una transacción: si algo falla, Postgres deshace todo y no queda aplicada a medias
+-- (Prisma no lo hace por su cuenta; ver OPERATIONS.md, "Cómo recuperarse de una migración fallida").
+BEGIN;
 -- CreateIndex
 CREATE INDEX "activity_logs_entityType_entityId_idx" ON "activity_logs"("entityType", "entityId");
 
@@ -49,3 +52,4 @@ CREATE INDEX "vouchers_requestId_idx" ON "vouchers"("requestId");
 -- CreateIndex
 CREATE INDEX "vouchers_createdAt_idx" ON "vouchers"("createdAt");
 
+COMMIT;
