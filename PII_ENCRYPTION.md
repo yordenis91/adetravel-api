@@ -131,3 +131,17 @@ Procedimiento:
 Ensayado el 2026-10-07 sobre una copia de una base sembrada (30 valores): simulación sin escritura,
 rotación de 30/30, y la API con la clave nueva mostró los 10 pasaportes (con la vieja, ninguno).
 Tests: `__tests__/pii-key-rotation.e2e.test.ts`.
+
+## Contraseña del SMTP
+
+`SystemConfig.smtpPassword` se guarda cifrada con la misma `PII_ENCRYPTION_KEY` y nunca sale de la API:
+`GET`/`PUT /system-config` devuelven `smtpPasswordSet: true|false` en su lugar. Al guardar, una
+contraseña vacía o ausente conserva la actual y `null` la borra. `email.service` la descifra al enviar
+(una contraseña antigua aún en texto plano también funciona).
+
+Para cifrar una contraseña guardada antes de este cambio (seguro de re-ejecutar):
+
+```bash
+npm run smtp:encrypt-password -- --dry-run
+npm run smtp:encrypt-password
+```
