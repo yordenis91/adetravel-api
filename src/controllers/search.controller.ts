@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem } from "../utils/response";
 import { asyncHandler } from "../utils/async-handler";
+import { getEffectivePermissions } from "../config/permissions";
 
 export const globalSearch = asyncHandler(async (req: Request, res: Response) => {
   const q = req.query.q as string;
@@ -11,11 +12,18 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response) => 
     return sendItem(res, { clients: [], requests: [], quotations: [], payments: [], vouchers: [] });
   }
 
+  // Cada grupo de resultados exige el mismo permiso VIEW_* que su listado: sin
+  // esto, cualquier usuario autenticado podía leer clientes, pagos, etc. por
+  // aquí aunque la API le negara esos módulos.
+  const { id, role, agencyRole } = req.user!;
+  const perms = new Set<string>(await getEffectivePermissions(prisma, id, role, agencyRole));
+  const can = (permission: string) => perms.has(permission);
+
   // 🔥 La Magia: Buscamos en las 5 tablas EXACTAMENTE AL MISMO TIEMPO
   // Limitamos a 5 resultados por tabla (take: 5) para que el servidor ni se entere.
   const [clients, requests, quotations, payments, vouchers] = await Promise.all([
     // 1. Buscar Clientes
-    prisma.client.findMany({
+    !can("VIEW_CLIENTS") ? [] : prisma.client.findMany({
       where: {
         OR: [
           { firstName: { contains: q, mode: "insensitive" } },
@@ -29,7 +37,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response) => 
     }),
     
     // 2. Buscar Solicitudes
-    prisma.request.findMany({
+    !can("VIEW_REQUESTS") ? [] : prisma.request.findMany({
       where: {
         OR: [
           { requestNumber: { contains: q, mode: "insensitive" } },
@@ -42,14 +50,14 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response) => 
     }),
 
     // 3. Buscar Cotizaciones
-    prisma.quotation.findMany({
+    !can("VIEW_QUOTATIONS") ? [] : prisma.quotation.findMany({
       where: { quotationNumber: { contains: q, mode: "insensitive" } },
       take: 5,
       select: { id: true, quotationNumber: true, total: true, currency: true, status: true }
     }),
 
     // 4. Buscar Pagos
-    prisma.payment.findMany({
+    !can("VIEW_PAYMENTS") ? [] : prisma.payment.findMany({
       where: {
         OR: [
           { paymentNumber: { contains: q, mode: "insensitive" } },
@@ -61,7 +69,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response) => 
     }),
 
     // 5. Buscar Vouchers
-    prisma.voucher.findMany({
+    !can("VIEW_VOUCHERS") ? [] : prisma.voucher.findMany({
       where: {
         OR: [
           { voucherNumber: { contains: q, mode: "insensitive" } },
