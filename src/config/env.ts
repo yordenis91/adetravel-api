@@ -14,6 +14,9 @@ const envSchema = z.object({
   SMTP_FROM: z.string().email().optional(),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15),
+  // Límite propio de /auth/login: solo cuenta intentos fallidos por IP.
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(10),
+  LOGIN_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15),
   SENTRY_DSN: z.string().optional(),
   // Clave AES-256 (32 bytes en hex, 64 caracteres) para cifrar PII sensible
   // de Cliente (pasaporte, cuenta bancaria) en reposo. Ver src/lib/pii-encryption.ts.
