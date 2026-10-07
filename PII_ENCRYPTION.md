@@ -95,13 +95,42 @@ cifrado es completamente transparente para el frontend.
 
 ## Rotar la clave
 
-No hay soporte automático todavía. Para rotar `PII_ENCRYPTION_KEY`:
+Cuándo: si la clave pudo quedar expuesta (apareció en un chat, un log, un commit) o como higiene
+periódica. La clave vigente se guarda en el Vaultwarden del administrador.
 
-1. Con la clave vieja aún activa, descifrar todo (se puede adaptar el script
-   de backfill para hacer el camino inverso) o mantener temporalmente ambas
-   claves disponibles y migrar campo por campo.
-2. Este es un procedimiento delicado — coordinar antes de intentarlo en
-   producción.
+`npm run pii:rotate-key` vuelve a cifrar con la clave nueva todo lo cifrado con la vieja (pasaporte,
+cuenta y titular bancarios de clientes, y la contraseña SMTP). Antes de escribir comprueba que todo
+se descifra con la vieja (o ya con la nueva, si una ejecución anterior se cortó); si algo no se
+descifra con ninguna, aborta sin tocar nada. Escribe en una transacción, verifica con la nueva antes
+de confirmar y es seguro de re-ejecutar. Lo que esté en texto plano no lo toca (usar
+`pii:encrypt-backfill`).
+
+Procedimiento:
+
+1. Generar la nueva (`openssl rand -hex 32`) y guardarla en Vaultwarden **junto a la vieja**, anotando
+   la fecha de inicio de cada una.
+2. Hacer un backup manual y comprobarlo con `npm run restore:drill` (con la clave vieja).
+3. Detener la API en Easypanel (sin réplicas en marcha): si sigue corriendo con la clave vieja,
+   escribiría datos nuevos con ella entre la rotación y el reinicio.
+4. Con `DATABASE_URL` de la base real y las dos claves en el entorno:
+
+   ```bash
+   export PII_ENCRYPTION_KEY_OLD=<vigente> PII_ENCRYPTION_KEY_NEW=<nueva>
+   npm run pii:rotate-key -- --dry-run   # cuenta, no escribe
+   npm run pii:rotate-key
+   ```
+
+5. Cambiar `PII_ENCRYPTION_KEY` en Easypanel por la nueva y arrancar la API. Comprobar que un
+   cliente con pasaporte se ve bien.
+6. **No borrar la clave vieja todavía:** los backups anteriores a la rotación siguen cifrados con
+   ella. Conservarla en Vaultwarden, marcada como "solo para restaurar backups hasta <fecha>", durante
+   `BACKUP_RETENTION_DAYS` (30 días por defecto). Para restaurar uno de esos backups, usar la vieja
+   y después rotar de nuevo.
+7. Al día siguiente, `npm run restore:drill` con la clave nueva sobre el primer backup posterior.
+
+Ensayado el 2026-10-07 sobre una copia de una base sembrada (30 valores): simulación sin escritura,
+rotación de 30/30, y la API con la clave nueva mostró los 10 pasaportes (con la vieja, ninguno).
+Tests: `__tests__/pii-key-rotation.e2e.test.ts`.
 
 ## Contraseña del SMTP
 

@@ -18,6 +18,7 @@
     "seed:flow": "ts-node prisma/seed-flow.ts",
     "seed:all": "npm run seed:admin && npm run seed:users && npm run seed:config && npm run seed:catalogs && npm run seed:clients && npm run seed:providers && npm run seed:flow",
     "pii:encrypt-backfill": "ts-node prisma/scripts/encrypt-existing-client-pii.ts",
+    "pii:rotate-key": "ts-node prisma/scripts/rotate-pii-key.ts",
     "smtp:encrypt-password": "ts-node prisma/scripts/encrypt-smtp-password.ts",
     "test": "jest --passWithNoTests",
     "test:e2e": "bash scripts/test-e2e.sh",
