@@ -54,10 +54,17 @@ export function resolveDelivery(
   return { send: true, to, subject };
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export async function sendEmail(options: {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }): Promise<void> {
   const delivery = resolveDelivery(options.to, options.subject);
   if (!delivery.send) {
@@ -82,7 +89,8 @@ export async function sendEmail(options: {
     from: smtp.from,
     to: delivery.to,
     subject: delivery.subject,
-    html: options.html
+    html: options.html,
+    ...(options.attachments?.length ? { attachments: options.attachments } : {})
   });
   logger.info({ to: maskEmail(options.to), mode: env.EMAIL_DELIVERY }, "Email enviado");
 }
@@ -93,6 +101,7 @@ export async function sendTemplateEmail(options: {
   variables?: Record<string, string>;
   fallbackSubject: string;
   fallbackHtml: string;
+  attachments?: EmailAttachment[];
 }): Promise<void> {
   const template = await prisma.emailTemplate.findFirst({
     where: { type: options.type, isActive: true }
@@ -108,6 +117,7 @@ export async function sendTemplateEmail(options: {
   await sendEmail({
     to: options.to,
     subject: interpolate(template?.subject ?? options.fallbackSubject),
-    html: interpolate(template?.bodyHtml ?? options.fallbackHtml)
+    html: interpolate(template?.bodyHtml ?? options.fallbackHtml),
+    attachments: options.attachments
   });
 }

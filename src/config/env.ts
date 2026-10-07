@@ -23,6 +23,18 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  // DECISIONES DE NEGOCIO ASUMIDAS (pendientes de confirmar con el dueño de la agencia; ver
+  // DECISIONES_PENDIENTES.md). Se cambian con una variable de entorno, sin tocar código.
+  // - Pagos parciales: apagado. Cada pago debe ser por el total de la cotización aceptada.
+  ALLOW_PARTIAL_PAYMENTS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  // - Cotizaciones vencidas: bloquean enviar y aceptar.
+  BLOCK_EXPIRED_QUOTATIONS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   // Salvaguarda de correo por entorno. "live": se envía a los destinatarios reales (producción).
   // "redirect": todo va a EMAIL_REDIRECT_TO, con el destinatario original en el asunto (demo y
   // pruebas con datos que pueden ser reales). "off": no se envía nada, solo se registra.

@@ -11,6 +11,42 @@ import { advanceWorkflowStatus } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/quotations.validator";
 import { buildQuotationHtml, generateQuotationPdfBuffer } from "../services/pdf.service";
 import { getAgencyHeader } from "../services/agency.service";
+import { logger } from "../utils/logger";
+import { escapeHtml } from "../utils/html";
+import { formatMoney } from "../utils/money";
+import { isExpired } from "../utils/dates";
+import { env } from "../config/env";
+
+/** Cuerpo del correo cuando no hay plantilla en base: número, monto, vigencia y, si corresponde, el PDF adjunto. */
+function buildQuotationEmailHtml(
+  quotation: { quotationNumber: string; currency: string; total: number | null; validUntil: string | null },
+  client: { firstName: string },
+  status: string
+): string {
+  const number = escapeHtml(quotation.quotationNumber);
+  const greeting = `<p>Estimado/a ${escapeHtml(client.firstName)},</p>`;
+  if (status !== "ENVIADA") {
+    return `${greeting}<p>Tu cotización ${number} ha cambiado al estado: <strong>${escapeHtml(status)}</strong>.</p>`;
+  }
+  const total = quotation.total != null ? `${quotation.currency} ${formatMoney(quotation.total, quotation.currency)}` : null;
+  return [
+    greeting,
+    `<p>Te enviamos la cotización <strong>${number}</strong>${total ? ` por un total de <strong>${escapeHtml(total)}</strong>` : ""}.</p>`,
+    quotation.validUntil ? `<p>Es válida hasta el ${escapeHtml(quotation.validUntil)}.</p>` : "",
+    "<p>Encontrarás el detalle en el PDF adjunto. Cualquier duda, responde a este correo.</p>",
+  ].join("");
+}
+
+/** PDF de la cotización como adjunto; si no se puede generar, el correo sale igual sin adjunto. */
+async function buildQuotationAttachment(quotation: any, client: any) {
+  try {
+    const content = await generateQuotationPdfBuffer({ ...quotation, client });
+    return [{ filename: `${quotation.quotationNumber}.pdf`, content, contentType: "application/pdf" }];
+  } catch (e) {
+    logger.error({ err: e, quotationId: quotation.id }, "No se pudo generar el PDF para adjuntar al correo");
+    return undefined;
+  }
+}
 
 export async function listQuotations(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -72,8 +108,8 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   }
 
   // 3. Recálculo seguro en el servidor
-  const normalizedItems = normalizeItems(data.items);
-  const totals = calculateTotals(normalizedItems, data.taxPercentage || 0, data.discount || 0);
+  const normalizedItems = normalizeItems(data.items, data.currency);
+  const totals = calculateTotals(normalizedItems, data.taxPercentage || 0, data.discount || 0, data.currency);
 
   const item = await prisma.quotation.create({
     data: { 
@@ -112,12 +148,25 @@ export async function updateQuotation(req: Request, res: Response): Promise<void
   const payload = { ...req.body };
   delete payload.status; // Protegemos el estado
 
-  // Recalcular si modifican ítems, impuestos o descuentos
-  if (payload.items || payload.taxPercentage !== undefined || payload.discount !== undefined) {
-    const items = payload.items ? normalizeItems(payload.items) : (existing.items as any[]);
+  // La solicitud y el cliente de una cotización no cambian: para otra solicitud se crea (o duplica) una nueva.
+  if (payload.requestId !== undefined && payload.requestId !== existing.requestId) {
+    throw new ApiError("No se puede cambiar la solicitud de una cotización", 400, "QUOTATION_REQUEST_LOCKED");
+  }
+  if (payload.clientId !== undefined && payload.clientId !== existing.clientId) {
+    throw new ApiError("No se puede cambiar el cliente de una cotización", 400, "QUOTATION_CLIENT_LOCKED");
+  }
+  if (payload.serviceId) {
+    const service = await prisma.service.findFirst({ where: { id: payload.serviceId, requestId: existing.requestId } });
+    if (!service) throw new ApiError("El servicio no pertenece a la solicitud de la cotización", 400);
+  }
+
+  // Recalcular si modifican ítems, impuestos, descuento o moneda (los decimales dependen de la moneda)
+  if (payload.items || payload.taxPercentage !== undefined || payload.discount !== undefined || payload.currency !== undefined) {
+    const currency = payload.currency ?? existing.currency;
+    const items = normalizeItems(payload.items ?? (existing.items as any[]), currency);
     const tax = payload.taxPercentage ?? existing.taxPercentage ?? 0;
     const discount = payload.discount ?? existing.discount ?? 0;
-    const totals = calculateTotals(items, tax, discount);
+    const totals = calculateTotals(items, tax, discount, currency);
     Object.assign(payload, { items, ...totals });
   }
 
@@ -143,7 +192,23 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
     throw new ApiError("El cliente no tiene un email registrado para enviar la cotización.", 409, "CLIENT_NO_EMAIL");
   }
 
-  const updated = await prisma.quotation.update({ where: { id }, data: { status: newStatus as any } });
+  // Una cotización vencida no se envía ni se acepta: hay que renovar la vigencia (editándola en Borrador).
+  // Decisión asumida (BLOCK_EXPIRED_QUOTATIONS=true), pendiente de confirmar: ver DECISIONES_PENDIENTES.md.
+  if (env.BLOCK_EXPIRED_QUOTATIONS && ["ENVIADA", "ACEPTADA"].includes(newStatus) && isExpired(existing.validUntil)) {
+    throw new ApiError(
+      `La cotización venció el ${existing.validUntil}. Actualiza la fecha de validez antes de continuar.`,
+      409,
+      "QUOTATION_EXPIRED"
+    );
+  }
+
+  // Cambio atómico: solo aplica si sigue en el estado leído. Dos peticiones simultáneas ya no
+  // repiten la transición (ni el correo ni el avance de flujo).
+  const swapped = await prisma.quotation.updateMany({ where: { id, status: currentStatus }, data: { status: newStatus as any } });
+  if (swapped.count === 0) {
+    throw new ApiError("La cotización cambió de estado mientras se procesaba. Recarga e intenta de nuevo.", 409, "STATUS_CONFLICT");
+  }
+  const updated = await prisma.quotation.findUniqueOrThrow({ where: { id } });
 
   // Sincronización automática con el flujo granular: 4.8 "Envío de Oferta al Cliente" ->
   // ENVIADO_AL_CLIENTE; 4.9 "Aceptación del cliente" -> ACEPTADA_POR_CLIENTE. La sección 4
@@ -170,12 +235,14 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
       "ACEPTADA": "QUOTATION_ACCEPTED",
       "RECHAZADA": "QUOTATION_REJECTED"
     };
+    const attachments = newStatus === "ENVIADA" ? await buildQuotationAttachment(updated, existing.client) : undefined;
     await sendTemplateEmail({
       type: emailTypes[newStatus],
       to: existing.client.email,
       fallbackSubject: `Cotización ${existing.quotationNumber} - ${newStatus.toLowerCase()}`,
-      fallbackHtml: `<p>Tu cotización ${existing.quotationNumber} ha cambiado al estado: <strong>${newStatus}</strong></p>`
-    }).catch(e => console.error("Error enviando email:", e));
+      fallbackHtml: buildQuotationEmailHtml(updated, existing.client, newStatus),
+      attachments
+    }).catch(e => logger.error({ err: e }, "Error enviando email de cotización"));
   }
 
   await createActivityLog({ action: "UPDATE", entityType: "Quotation", entityId: id, entityLabel: existing.quotationNumber, description: `Estado: ${currentStatus} -> ${newStatus}. ${notes || ""}`, performedBy: req.user!.id });
@@ -233,9 +300,15 @@ export async function downloadQuotationPdf(req: Request, res: Response): Promise
 export async function deleteQuotation(req: Request, res: Response): Promise<void> {
   const id = req.params.id as string;
   const existing = await prisma.quotation.findUnique({ where: { id } });
-  
-  if (existing && !["BORRADOR", "RECHAZADA"].includes(existing.status)) {
+  if (!existing) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
+
+  if (!["BORRADOR", "RECHAZADA"].includes(existing.status)) {
     throw new ApiError("No se puede eliminar una cotización que ya fue enviada o aceptada", 409);
+  }
+
+  const linkedPayments = await prisma.payment.count({ where: { quotationId: id } });
+  if (linkedPayments > 0) {
+    throw new ApiError("No se puede eliminar una cotización que tiene pagos asociados", 409, "QUOTATION_HAS_PAYMENTS");
   }
 
   const item = await prisma.quotation.delete({ where: { id } });

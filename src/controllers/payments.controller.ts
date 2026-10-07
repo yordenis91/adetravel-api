@@ -7,6 +7,9 @@ import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
 import { advanceWorkflowStatus } from "../services/workflow.service";
+import { isRequestFullyPaid } from "../services/payment-coverage";
+import { resolveFullPaymentQuotation } from "../services/payment-rules";
+import { env } from "../config/env";
 import { VALID_TRANSITIONS } from "../validators/payments.validator";
 
 export async function listPayments(req: Request, res: Response): Promise<void> {
@@ -46,18 +49,16 @@ export async function listPayments(req: Request, res: Response): Promise<void> {
 }
 
 export async function getPaymentStats(req: Request, res: Response): Promise<void> {
-  const payments = await prisma.payment.findMany({ where: { status: "COMPLETADO" } });
-  
-  const totalCLP = payments.filter(p => p.currency === "CLP").reduce((sum, p) => sum + p.amount, 0);
-  const totalUSD = payments.filter(p => p.currency === "USD").reduce((sum, p) => sum + p.amount, 0);
-
-  const [pendientes, completados, cancelados] = await Promise.all([
+  const [totals, pendientes, completados, cancelados] = await Promise.all([
+    prisma.payment.groupBy({ by: ["currency"], where: { status: "COMPLETADO" }, _sum: { amount: true } }),
     prisma.payment.count({ where: { status: "PENDIENTE" } }),
     prisma.payment.count({ where: { status: "COMPLETADO" } }),
     prisma.payment.count({ where: { status: "CANCELADO" } }),
   ]);
 
-  sendItem(res, { totalCLP, totalUSD, pendientes, completados, cancelados });
+  const totalFor = (currency: string) => totals.find((t) => t.currency === currency)?._sum.amount ?? 0;
+
+  sendItem(res, { totalCLP: totalFor("CLP"), totalUSD: totalFor("USD"), pendientes, completados, cancelados });
 }
 
 export async function getPayment(req: Request, res: Response): Promise<void> {
@@ -75,11 +76,31 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
   // 1. Validar existencia de la solicitud y extraer el cliente
   const request = await prisma.request.findUnique({ where: { id: data.requestId } });
   if (!request) throw new ApiError("La solicitud indicada no existe", 404);
+  if (request.status === "CANCELADA") {
+    throw new ApiError("No se pueden registrar pagos en una solicitud cancelada", 409, "REQUEST_CANCELLED");
+  }
 
-  // 2. Validar que la cotización pertenezca a la solicitud
-  if (data.quotationId) {
+  // 2. Cotización: sin pagos parciales (ALLOW_PARTIAL_PAYMENTS=false, decisión asumida) el pago es por
+  // el total de una cotización aceptada; con pagos parciales basta que pertenezca a la solicitud
+  // y esté en la misma moneda.
+  const currency = data.currency ?? "CLP";
+  if (!env.ALLOW_PARTIAL_PAYMENTS) {
+    data.quotationId = await resolveFullPaymentQuotation({
+      requestId: data.requestId,
+      quotationId: data.quotationId,
+      amount: data.amount,
+      currency,
+    });
+  } else if (data.quotationId) {
     const quotation = await prisma.quotation.findFirst({ where: { id: data.quotationId, requestId: data.requestId } });
     if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
+    if (data.currency && data.currency !== quotation.currency) {
+      throw new ApiError(
+        `La moneda del pago (${data.currency}) no coincide con la de la cotización (${quotation.currency})`,
+        400,
+        "CURRENCY_MISMATCH"
+      );
+    }
   }
 
   const config = await prisma.systemConfig.findFirst();
@@ -109,6 +130,42 @@ export async function updatePayment(req: Request, res: Response): Promise<void> 
   const payload = { ...req.body };
   delete payload.status; // Protegemos el estado
 
+  // Si cambia la solicitud o la cotización se revalida todo el conjunto y el cliente se vuelve a
+  // derivar de la solicitud, igual que al crear (antes quedaba el clientId de la solicitud anterior).
+  const targetRequestId = payload.requestId ?? existing.requestId;
+  if (payload.requestId !== undefined && payload.requestId !== existing.requestId) {
+    const request = await prisma.request.findUnique({ where: { id: payload.requestId } });
+    if (!request) throw new ApiError("La solicitud indicada no existe", 404);
+    if (request.status === "CANCELADA") {
+      throw new ApiError("No se pueden registrar pagos en una solicitud cancelada", 409, "REQUEST_CANCELLED");
+    }
+    payload.clientId = request.clientId;
+  }
+  const targetQuotationId = payload.quotationId !== undefined ? payload.quotationId : existing.quotationId;
+  const touchesAmounts = ["requestId", "quotationId", "amount", "currency"].some((k) => payload[k] !== undefined);
+  if (!env.ALLOW_PARTIAL_PAYMENTS) {
+    if (touchesAmounts) {
+      payload.quotationId = await resolveFullPaymentQuotation({
+        requestId: targetRequestId,
+        quotationId: targetQuotationId,
+        amount: payload.amount ?? existing.amount,
+        currency: payload.currency ?? existing.currency,
+        excludePaymentId: id,
+      });
+    }
+  } else if (targetQuotationId && (payload.requestId !== undefined || payload.quotationId !== undefined || payload.currency !== undefined)) {
+    const quotation = await prisma.quotation.findFirst({ where: { id: targetQuotationId, requestId: targetRequestId } });
+    if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
+    const currency = payload.currency ?? existing.currency;
+    if (currency !== quotation.currency) {
+      throw new ApiError(
+        `La moneda del pago (${currency}) no coincide con la de la cotización (${quotation.currency})`,
+        400,
+        "CURRENCY_MISMATCH"
+      );
+    }
+  }
+
   const item = await prisma.payment.update({
     where: { id },
     data: payload,
@@ -137,9 +194,14 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
   const prevWasCompleted = prevStatusUpper === "COMPLETADO" || prevStatusUpper === "COMPLETED";
   const justCompleted = !prevWasCompleted && newStatusIsCompleted;
 
-  const updated = await prisma.payment.update({
+  // Cambio atómico: solo aplica si el pago sigue en el estado leído, así dos peticiones
+  // simultáneas no duplican el correo, la notificación ni el avance del flujo.
+  const swapped = await prisma.payment.updateMany({ where: { id, status: currentStatus }, data: { status: newStatus as any } });
+  if (swapped.count === 0) {
+    throw new ApiError("El pago cambió de estado mientras se procesaba. Recarga e intenta de nuevo.", 409, "STATUS_CONFLICT");
+  }
+  const updated = await prisma.payment.findUniqueOrThrow({
     where: { id },
-    data: { status: newStatus as any },
     include: { client: true, request: true }
   });
 
@@ -184,7 +246,9 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
   // del cliente es un paso intermedio, no el cierre de la venta. Pasa a PAGADO_POR_CLIENTE y
   // desciende automáticamente a todos los Servicios de la Solicitud. La Solicitud solo llega a
   // VENDIDA más adelante, tras pago al proveedor y entrega de voucher (ver requests.controller).
-  if (newStatus === "COMPLETADO" && existing.requestId) {
+  // Solo cuando los pagos completados cubren lo aceptado: un anticipo (pago parcial) queda
+  // registrado pero no da la solicitud por pagada, y sin cotización aceptada no avanza nada.
+  if (newStatus === "COMPLETADO" && existing.requestId && (await isRequestFullyPaid(existing.requestId))) {
     await advanceWorkflowStatus(existing.requestId, null, "PAGADO_POR_CLIENTE");
   }
 
