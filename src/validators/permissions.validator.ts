@@ -13,7 +13,10 @@ export const grantUserPermissionSchema = z.object({
   permission: permissionKeySchema,
   effect: z.enum(["GRANT", "DENY"]).default("GRANT"),
   expiresAt: z.string().datetime().optional(),
-});
+}).refine(
+  (v) => v.effect !== "DENY" || !v.expiresAt || new Date(v.expiresAt) > new Date(),
+  { message: "La fecha de expiración de una denegación debe ser futura", path: ["expiresAt"] }
+);
 
 export const userIdParamSchema = z.object({
   userId: z.string().uuid("ID de usuario inválido"),
