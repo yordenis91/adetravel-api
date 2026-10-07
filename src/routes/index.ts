@@ -23,11 +23,13 @@ import {
 import { jobsRouter } from "./jobs.routes";
 import { permissionsRouter } from "./permissions.routes";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { clientVisibility } from "../middlewares/client-visibility.middleware";
 
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use(authMiddleware);
+apiRouter.use(clientVisibility);
 apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/users", usersRouter);
 apiRouter.use("/notifications", notificationsRouter);
