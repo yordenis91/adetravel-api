@@ -15,10 +15,15 @@ const mockPrisma = {
   },
   payment: { count: jest.fn() },
 };
+const mockEnv: Record<string, unknown> = {};
 const mockSendTemplateEmail = jest.fn().mockResolvedValue(undefined);
 const mockGeneratePdf = jest.fn().mockResolvedValue(Buffer.from("%PDF-fake"));
 
 jest.mock("../../../src/lib/prisma", () => ({ prisma: mockPrisma }));
+jest.mock("../../../src/config/env", () => {
+  Object.assign(mockEnv, jest.requireActual("../../../src/config/env").env);
+  return { env: mockEnv };
+});
 jest.mock("../../../src/services/activity-log.service", () => ({ createActivityLog: jest.fn().mockResolvedValue(undefined) }));
 jest.mock("../../../src/services/email.service", () => ({ sendTemplateEmail: mockSendTemplateEmail }));
 jest.mock("../../../src/services/numbering.service", () => ({ generateNumber: jest.fn().mockResolvedValue("COTIZ-2026-10-0001") }));
@@ -123,6 +128,7 @@ describe("updateQuotation", () => {
 describe("changeQuotationStatus", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEnv.BLOCK_EXPIRED_QUOTATIONS = true;
     mockPrisma.systemConfig.findFirst.mockResolvedValue({ notifyOnQuotationSent: true });
     mockPrisma.quotation.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.quotation.findUniqueOrThrow.mockImplementation(async () => draft({ status: "ENVIADA" }));
@@ -139,6 +145,13 @@ describe("changeQuotationStatus", () => {
     mockPrisma.quotation.findUnique.mockResolvedValue(draft({ status: "ENVIADA", validUntil: past }));
     await expect(changeQuotationStatus(reqFor({ id: "q1" }, { status: "ACEPTADA" }), createMockRes() as unknown as Response))
       .rejects.toMatchObject({ code: "QUOTATION_EXPIRED" });
+  });
+
+  it("con BLOCK_EXPIRED_QUOTATIONS=false una cotización vencida sí se puede enviar", async () => {
+    mockEnv.BLOCK_EXPIRED_QUOTATIONS = false;
+    mockPrisma.quotation.findUnique.mockResolvedValue(draft({ validUntil: past }));
+    await changeQuotationStatus(reqFor({ id: "q1" }, { status: "ENVIADA" }), createMockRes() as unknown as Response);
+    expect(mockPrisma.quotation.updateMany).toHaveBeenCalled();
   });
 
   it("rechazar sí se permite aunque esté vencida", async () => {

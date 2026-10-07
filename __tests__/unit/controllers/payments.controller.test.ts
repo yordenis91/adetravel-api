@@ -7,6 +7,8 @@ const mockSendTemplateEmail = jest.fn().mockResolvedValue(undefined);
 const mockGenerateNumber = jest.fn().mockResolvedValue("PAG-2026-01-0001");
 const mockAdvanceWorkflowStatus = jest.fn().mockResolvedValue(undefined);
 const mockIsRequestFullyPaid = jest.fn().mockResolvedValue(true);
+const mockResolveFullPayment = jest.fn();
+const mockEnv: Record<string, unknown> = {};
 
 jest.mock("../../../src/lib/prisma", () => ({ prisma: mockPrisma }));
 jest.mock("../../../src/services/activity-log.service", () => ({
@@ -24,6 +26,13 @@ jest.mock("../../../src/services/workflow.service", () => ({
 jest.mock("../../../src/services/payment-coverage", () => ({
   isRequestFullyPaid: mockIsRequestFullyPaid,
 }));
+jest.mock("../../../src/services/payment-rules", () => ({
+  resolveFullPaymentQuotation: mockResolveFullPayment,
+}));
+jest.mock("../../../src/config/env", () => {
+  Object.assign(mockEnv, jest.requireActual("../../../src/config/env").env);
+  return { env: mockEnv };
+});
 
 import {
   listPayments,
@@ -46,6 +55,9 @@ describe("payments.controller", () => {
     jest.clearAllMocks();
     mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
     mockIsRequestFullyPaid.mockResolvedValue(true);
+    // Los tests existentes cubren el modo con pagos parciales; el modo por defecto
+    // (sin pagos parciales) se prueba en su propio bloque.
+    mockEnv.ALLOW_PARTIAL_PAYMENTS = true;
   });
 
   describe("listPayments", () => {
@@ -207,6 +219,55 @@ describe("payments.controller", () => {
 
       await expect(createPayment(req, createMockRes())).rejects.toMatchObject({ statusCode: 400, code: "CURRENCY_MISMATCH" });
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("sin pagos parciales (ALLOW_PARTIAL_PAYMENTS=false, decisión asumida)", () => {
+    beforeEach(() => {
+      mockEnv.ALLOW_PARTIAL_PAYMENTS = false;
+    });
+
+    it("al crear: valida contra la cotización aceptada y guarda la cotización resuelta", async () => {
+      mockPrisma.request.findUnique.mockResolvedValue({ id: "req-1", clientId: "c1", status: "RECEPCIONADA" });
+      mockPrisma.systemConfig.findFirst.mockResolvedValue(null);
+      mockPrisma.payment.create.mockResolvedValue({ id: "p1", paymentNumber: "PAG-1", client: {} });
+      mockResolveFullPayment.mockResolvedValue("q-aceptada");
+
+      await createPayment(buildReq({ body: { requestId: "req-1", amount: 119000, currency: "CLP" } } as any), createMockRes());
+
+      expect(mockResolveFullPayment).toHaveBeenCalledWith({ requestId: "req-1", quotationId: undefined, amount: 119000, currency: "CLP" });
+      expect(mockPrisma.payment.create.mock.calls[0][0].data).toMatchObject({ quotationId: "q-aceptada" });
+    });
+
+    it("al crear: si la regla rechaza (pago parcial), no se crea el pago", async () => {
+      mockPrisma.request.findUnique.mockResolvedValue({ id: "req-1", clientId: "c1", status: "RECEPCIONADA" });
+      mockResolveFullPayment.mockRejectedValue(Object.assign(new Error("parcial"), { statusCode: 400, code: "PARTIAL_PAYMENT_NOT_ALLOWED" }));
+
+      await expect(
+        createPayment(buildReq({ body: { requestId: "req-1", amount: 10, currency: "CLP" } } as any), createMockRes())
+      ).rejects.toMatchObject({ code: "PARTIAL_PAYMENT_NOT_ALLOWED" });
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it("al editar el monto: revalida excluyéndose a sí mismo", async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue({ id: "p1", status: "PENDIENTE", requestId: "req-1", quotationId: "q1", currency: "CLP", amount: 119000 });
+      mockPrisma.payment.update.mockResolvedValue({ id: "p1", paymentNumber: "PAG-1", client: {} });
+      mockResolveFullPayment.mockResolvedValue("q1");
+
+      await updatePayment(buildReq({ params: { id: "p1" }, body: { amount: 119000 } } as any), createMockRes());
+
+      expect(mockResolveFullPayment).toHaveBeenCalledWith({
+        requestId: "req-1", quotationId: "q1", amount: 119000, currency: "CLP", excludePaymentId: "p1",
+      });
+    });
+
+    it("al editar solo la referencia o las notas no vuelve a validar montos", async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue({ id: "p1", status: "PENDIENTE", requestId: "req-1", quotationId: "q1", currency: "CLP", amount: 119000 });
+      mockPrisma.payment.update.mockResolvedValue({ id: "p1", paymentNumber: "PAG-1", client: {} });
+
+      await updatePayment(buildReq({ params: { id: "p1" }, body: { reference: "TRX-9" } } as any), createMockRes());
+
+      expect(mockResolveFullPayment).not.toHaveBeenCalled();
     });
   });
 

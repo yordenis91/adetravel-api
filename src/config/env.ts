@@ -23,6 +23,18 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  // DECISIONES DE NEGOCIO ASUMIDAS (pendientes de confirmar con el dueño de la agencia; ver
+  // DECISIONES_PENDIENTES.md). Se cambian con una variable de entorno, sin tocar código.
+  // - Pagos parciales: apagado. Cada pago debe ser por el total de la cotización aceptada.
+  ALLOW_PARTIAL_PAYMENTS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  // - Cotizaciones vencidas: bloquean enviar y aceptar.
+  BLOCK_EXPIRED_QUOTATIONS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
   SENTRY_DSN: z.string().optional(),
   // Clave AES-256 (32 bytes en hex, 64 caracteres) para cifrar PII sensible
   // de Cliente (pasaporte, cuenta bancaria) en reposo. Ver src/lib/pii-encryption.ts.

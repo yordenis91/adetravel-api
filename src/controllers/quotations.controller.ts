@@ -15,6 +15,7 @@ import { logger } from "../utils/logger";
 import { escapeHtml } from "../utils/html";
 import { formatMoney } from "../utils/money";
 import { isExpired } from "../utils/dates";
+import { env } from "../config/env";
 
 /** Cuerpo del correo cuando no hay plantilla en base: número, monto, vigencia y, si corresponde, el PDF adjunto. */
 function buildQuotationEmailHtml(
@@ -192,7 +193,8 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
   }
 
   // Una cotización vencida no se envía ni se acepta: hay que renovar la vigencia (editándola en Borrador).
-  if (["ENVIADA", "ACEPTADA"].includes(newStatus) && isExpired(existing.validUntil)) {
+  // Decisión asumida (BLOCK_EXPIRED_QUOTATIONS=true), pendiente de confirmar: ver DECISIONES_PENDIENTES.md.
+  if (env.BLOCK_EXPIRED_QUOTATIONS && ["ENVIADA", "ACEPTADA"].includes(newStatus) && isExpired(existing.validUntil)) {
     throw new ApiError(
       `La cotización venció el ${existing.validUntil}. Actualiza la fecha de validez antes de continuar.`,
       409,

@@ -8,6 +8,8 @@ import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
 import { advanceWorkflowStatus } from "../services/workflow.service";
 import { isRequestFullyPaid } from "../services/payment-coverage";
+import { resolveFullPaymentQuotation } from "../services/payment-rules";
+import { env } from "../config/env";
 import { VALID_TRANSITIONS } from "../validators/payments.validator";
 
 export async function listPayments(req: Request, res: Response): Promise<void> {
@@ -78,8 +80,18 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
     throw new ApiError("No se pueden registrar pagos en una solicitud cancelada", 409, "REQUEST_CANCELLED");
   }
 
-  // 2. Validar que la cotización pertenezca a la solicitud y esté en la misma moneda
-  if (data.quotationId) {
+  // 2. Cotización: sin pagos parciales (ALLOW_PARTIAL_PAYMENTS=false, decisión asumida) el pago es por
+  // el total de una cotización aceptada; con pagos parciales basta que pertenezca a la solicitud
+  // y esté en la misma moneda.
+  const currency = data.currency ?? "CLP";
+  if (!env.ALLOW_PARTIAL_PAYMENTS) {
+    data.quotationId = await resolveFullPaymentQuotation({
+      requestId: data.requestId,
+      quotationId: data.quotationId,
+      amount: data.amount,
+      currency,
+    });
+  } else if (data.quotationId) {
     const quotation = await prisma.quotation.findFirst({ where: { id: data.quotationId, requestId: data.requestId } });
     if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
     if (data.currency && data.currency !== quotation.currency) {
@@ -130,7 +142,18 @@ export async function updatePayment(req: Request, res: Response): Promise<void> 
     payload.clientId = request.clientId;
   }
   const targetQuotationId = payload.quotationId !== undefined ? payload.quotationId : existing.quotationId;
-  if (targetQuotationId && (payload.requestId !== undefined || payload.quotationId !== undefined || payload.currency !== undefined)) {
+  const touchesAmounts = ["requestId", "quotationId", "amount", "currency"].some((k) => payload[k] !== undefined);
+  if (!env.ALLOW_PARTIAL_PAYMENTS) {
+    if (touchesAmounts) {
+      payload.quotationId = await resolveFullPaymentQuotation({
+        requestId: targetRequestId,
+        quotationId: targetQuotationId,
+        amount: payload.amount ?? existing.amount,
+        currency: payload.currency ?? existing.currency,
+        excludePaymentId: id,
+      });
+    }
+  } else if (targetQuotationId && (payload.requestId !== undefined || payload.quotationId !== undefined || payload.currency !== undefined)) {
     const quotation = await prisma.quotation.findFirst({ where: { id: targetQuotationId, requestId: targetRequestId } });
     if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
     const currency = payload.currency ?? existing.currency;
