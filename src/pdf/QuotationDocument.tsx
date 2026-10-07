@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
 import type { AgencyHeader } from "../services/agency.service";
+import { formatMoney } from "../utils/money";
 
 const NAVY = "#0F1E3C";
 const GOLD = "#C9A84C";
@@ -44,8 +45,6 @@ interface QuotationDocumentProps {
   agency: AgencyHeader;
 }
 
-const fmt = (n: number) => n.toLocaleString("es-CL");
-
 export function QuotationDocument({ quotationNumber, currency, clientName, items, subtotal, taxPercentage, taxAmount, total, notes, agency }: QuotationDocumentProps) {
   return (
     <Document>
@@ -76,8 +75,8 @@ export function QuotationDocument({ quotationNumber, currency, clientName, items
               <Text style={[styles.tableCell, styles.colService]}>{item.service}</Text>
               <Text style={[styles.tableCell, styles.colDesc]}>{item.description}</Text>
               <Text style={[styles.tableCell, styles.colQty]}>{item.quantity}</Text>
-              <Text style={[styles.tableCell, styles.colPrice]}>{currency} {fmt(item.unitPrice)}</Text>
-              <Text style={[styles.tableCell, styles.colTotal]}>{currency} {fmt(item.total)}</Text>
+              <Text style={[styles.tableCell, styles.colPrice]}>{currency} {formatMoney(item.unitPrice, currency)}</Text>
+              <Text style={[styles.tableCell, styles.colTotal]}>{currency} {formatMoney(item.total, currency)}</Text>
             </View>
           ))}
         </View>
@@ -85,15 +84,15 @@ export function QuotationDocument({ quotationNumber, currency, clientName, items
         <View style={styles.totalsTable}>
           <View style={styles.totalsRow}>
             <Text>Subtotal</Text>
-            <Text>{currency} {fmt(subtotal)}</Text>
+            <Text>{currency} {formatMoney(subtotal, currency)}</Text>
           </View>
           <View style={styles.totalsRow}>
             <Text>IVA ({taxPercentage}%)</Text>
-            <Text>{currency} {fmt(taxAmount)}</Text>
+            <Text>{currency} {formatMoney(taxAmount, currency)}</Text>
           </View>
           <View style={styles.totalRow}>
             <Text>TOTAL</Text>
-            <Text>{currency} {fmt(total)}</Text>
+            <Text>{currency} {formatMoney(total, currency)}</Text>
           </View>
         </View>
 

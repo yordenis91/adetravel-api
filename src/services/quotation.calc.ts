@@ -1,3 +1,5 @@
+import { roundMoney } from "../utils/money";
+
 export interface QuotationItem {
   service: string;
   description: string;
@@ -12,18 +14,32 @@ export interface QuotationTotals {
   total: number;
 }
 
-export function calculateTotals(items: QuotationItem[], taxPercentage: number, discount: number): QuotationTotals {
-  const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  const discountedSubtotal = Math.max(0, subtotal - discount);
-  const taxAmount = Math.round((discountedSubtotal * taxPercentage) / 100);
-  const total = discountedSubtotal + taxAmount;
+/**
+ * Totales de una cotización. Cada línea se redondea primero a los decimales de la moneda y el
+ * subtotal es la suma de esas líneas ya redondeadas, así lo que se imprime siempre cuadra:
+ * subtotal - descuento + IVA = total. (Antes todo se redondeaba a enteros, lo que en USD
+ * perdía los centavos y dejaba un total que no coincidía con subtotal + IVA.)
+ */
+export function calculateTotals(
+  items: QuotationItem[],
+  taxPercentage: number,
+  discount: number,
+  currency: string = "CLP"
+): QuotationTotals {
+  const subtotal = roundMoney(
+    items.reduce((sum, item) => sum + roundMoney(item.quantity * item.unitPrice, currency), 0),
+    currency
+  );
+  const discountedSubtotal = roundMoney(Math.max(0, subtotal - discount), currency);
+  const taxAmount = roundMoney((discountedSubtotal * taxPercentage) / 100, currency);
+  const total = roundMoney(discountedSubtotal + taxAmount, currency);
 
-  return { subtotal: Math.round(subtotal), taxAmount, total };
+  return { subtotal, taxAmount, total };
 }
 
-export function normalizeItems(items: QuotationItem[]): QuotationItem[] {
+export function normalizeItems(items: QuotationItem[], currency: string = "CLP"): QuotationItem[] {
   return items.map(item => ({
     ...item,
-    total: Math.round(item.quantity * item.unitPrice),
+    total: roundMoney(item.quantity * item.unitPrice, currency),
   }));
 }

@@ -6,6 +6,9 @@ export function createPrismaMock() {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findUniqueOrThrow: jest.fn(),
+      groupBy: jest.fn(),
       delete: jest.fn(),
     },
     request: {
@@ -14,6 +17,7 @@ export function createPrismaMock() {
     },
     quotation: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
     },
     systemConfig: {
       findFirst: jest.fn(),

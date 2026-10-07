@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
 import type { AgencyHeader } from "../services/agency.service";
+import { formatMoney } from "../utils/money";
 
 const NAVY = "#0F1E3C";
 const GOLD = "#C9A84C";
@@ -85,7 +86,7 @@ export function VoucherDocument({
           <View style={styles.row}><Text style={styles.label}>Cliente</Text><Text style={styles.value}>{clientName}</Text></View>
           <View style={styles.row}><Text style={styles.label}>Proveedor</Text><Text style={styles.value}>{providerName || "-"}</Text></View>
           {amount != null ? (
-            <View style={styles.row}><Text style={styles.label}>Monto</Text><Text style={styles.value}>{currency} {amount.toLocaleString("es-CL")}</Text></View>
+            <View style={styles.row}><Text style={styles.label}>Monto</Text><Text style={styles.value}>{currency} {formatMoney(amount, currency)}</Text></View>
           ) : null}
         </View>
 

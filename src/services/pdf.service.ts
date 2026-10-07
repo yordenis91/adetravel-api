@@ -6,6 +6,7 @@ import { QuotationDocument } from "../pdf/QuotationDocument";
 import { VoucherDocument } from "../pdf/VoucherDocument";
 import { AgencyHeader, getAgencyHeader } from "./agency.service";
 import { escapeHtml } from "../utils/html";
+import { formatMoney } from "../utils/money";
 
 export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
   const itemsRows = data.items.map((item: QuotationItem) => `
@@ -13,8 +14,8 @@ export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
       <td class="item-service">${escapeHtml(item.service)}</td>
       <td class="item-desc">${escapeHtml(item.description)}</td>
       <td class="item-qty center">${item.quantity}</td>
-      <td class="item-price right">${data.currency} ${item.unitPrice.toLocaleString("es-CL")}</td>
-      <td class="item-total right">${data.currency} ${item.total.toLocaleString("es-CL")}</td>
+      <td class="item-price right">${data.currency} ${formatMoney(item.unitPrice, data.currency)}</td>
+      <td class="item-total right">${data.currency} ${formatMoney(item.total, data.currency)}</td>
     </tr>
   `).join("");
 
@@ -55,9 +56,9 @@ export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
     <tbody>${itemsRows}</tbody>
   </table>
   <table class="totals-table">
-    <tr><td>Subtotal</td><td class="right">${data.currency} ${data.subtotal.toLocaleString("es-CL")}</td></tr>
-    <tr><td>IVA (${data.taxPercentage}%)</td><td class="right">${data.currency} ${data.taxAmount.toLocaleString("es-CL")}</td></tr>
-    <tr class="total-row"><td>TOTAL</td><td class="right">${data.currency} ${data.total.toLocaleString("es-CL")}</td></tr>
+    <tr><td>Subtotal</td><td class="right">${data.currency} ${formatMoney(data.subtotal, data.currency)}</td></tr>
+    <tr><td>IVA (${data.taxPercentage}%)</td><td class="right">${data.currency} ${formatMoney(data.taxAmount, data.currency)}</td></tr>
+    <tr class="total-row"><td>TOTAL</td><td class="right">${data.currency} ${formatMoney(data.total, data.currency)}</td></tr>
   </table>
   <div style="clear:both"></div>
   ${data.notes ? `<h4>Notas</h4><p>${escapeHtml(data.notes)}</p>` : ''}

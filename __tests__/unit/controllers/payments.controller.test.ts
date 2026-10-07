@@ -6,6 +6,7 @@ const mockCreateActivityLog = jest.fn().mockResolvedValue(undefined);
 const mockSendTemplateEmail = jest.fn().mockResolvedValue(undefined);
 const mockGenerateNumber = jest.fn().mockResolvedValue("PAG-2026-01-0001");
 const mockAdvanceWorkflowStatus = jest.fn().mockResolvedValue(undefined);
+const mockIsRequestFullyPaid = jest.fn().mockResolvedValue(true);
 
 jest.mock("../../../src/lib/prisma", () => ({ prisma: mockPrisma }));
 jest.mock("../../../src/services/activity-log.service", () => ({
@@ -19,6 +20,9 @@ jest.mock("../../../src/services/numbering.service", () => ({
 }));
 jest.mock("../../../src/services/workflow.service", () => ({
   advanceWorkflowStatus: mockAdvanceWorkflowStatus,
+}));
+jest.mock("../../../src/services/payment-coverage", () => ({
+  isRequestFullyPaid: mockIsRequestFullyPaid,
 }));
 
 import {
@@ -40,6 +44,8 @@ function buildReq(overrides: Partial<Request> = {}): Request {
 describe("payments.controller", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.payment.updateMany.mockResolvedValue({ count: 1 });
+    mockIsRequestFullyPaid.mockResolvedValue(true);
   });
 
   describe("listPayments", () => {
@@ -84,11 +90,10 @@ describe("payments.controller", () => {
   });
 
   describe("getPaymentStats", () => {
-    it("suma correctamente los montos COMPLETADO separados por moneda", async () => {
-      mockPrisma.payment.findMany.mockResolvedValue([
-        { currency: "CLP", amount: 1000 },
-        { currency: "CLP", amount: 2000 },
-        { currency: "USD", amount: 50 },
+    it("suma los montos COMPLETADO por moneda con una agregación en base", async () => {
+      mockPrisma.payment.groupBy.mockResolvedValue([
+        { currency: "CLP", _sum: { amount: 3000 } },
+        { currency: "USD", _sum: { amount: 50 } },
       ]);
       mockPrisma.payment.count
         .mockResolvedValueOnce(3) // pendientes
@@ -98,20 +103,25 @@ describe("payments.controller", () => {
       const res = createMockRes();
       await getPaymentStats(buildReq(), res);
 
+      expect(mockPrisma.payment.groupBy).toHaveBeenCalledWith({
+        by: ["currency"],
+        where: { status: "COMPLETADO" },
+        _sum: { amount: true },
+      });
       expect(res.json).toHaveBeenCalledWith({
         data: { totalCLP: 3000, totalUSD: 50, pendientes: 3, completados: 5, cancelados: 1 },
       });
     });
 
-    it("no cuenta pagos que no estén COMPLETADO en las sumas por moneda", async () => {
-      mockPrisma.payment.findMany.mockResolvedValue([]);
+    it("devuelve 0 en una moneda sin pagos completados", async () => {
+      mockPrisma.payment.groupBy.mockResolvedValue([{ currency: "CLP", _sum: { amount: 1000 } }]);
       mockPrisma.payment.count.mockResolvedValue(0);
 
       const res = createMockRes();
       await getPaymentStats(buildReq(), res);
 
-      expect(mockPrisma.payment.findMany).toHaveBeenCalledWith({
-        where: { status: "COMPLETADO" },
+      expect(res.json).toHaveBeenCalledWith({
+        data: expect.objectContaining({ totalCLP: 1000, totalUSD: 0 }),
       });
     });
   });
@@ -181,6 +191,50 @@ describe("payments.controller", () => {
     });
   });
 
+  describe("createPayment (reglas de consistencia)", () => {
+    it("rechaza (409) un pago en una solicitud cancelada", async () => {
+      mockPrisma.request.findUnique.mockResolvedValue({ id: "req-1", clientId: "c1", status: "CANCELADA" });
+      const req = buildReq({ body: { requestId: "req-1", amount: 100 } } as any);
+
+      await expect(createPayment(req, createMockRes())).rejects.toMatchObject({ statusCode: 409, code: "REQUEST_CANCELLED" });
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza (400) un pago en USD contra una cotización en CLP", async () => {
+      mockPrisma.request.findUnique.mockResolvedValue({ id: "req-1", clientId: "c1", status: "RECEPCIONADA" });
+      mockPrisma.quotation.findFirst.mockResolvedValue({ id: "q1", currency: "CLP" });
+      const req = buildReq({ body: { requestId: "req-1", quotationId: "q1", amount: 100, currency: "USD" } } as any);
+
+      await expect(createPayment(req, createMockRes())).rejects.toMatchObject({ statusCode: 400, code: "CURRENCY_MISMATCH" });
+      expect(mockPrisma.payment.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updatePayment (cambio de solicitud o cotización)", () => {
+    const existing = { id: "p1", status: "PENDIENTE", requestId: "req-1", quotationId: null, currency: "CLP", clientId: "c1" };
+
+    it("al cambiar de solicitud vuelve a derivar el clientId de la nueva", async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue(existing);
+      mockPrisma.request.findUnique.mockResolvedValue({ id: "req-2", clientId: "c2", status: "RECEPCIONADA" });
+      mockPrisma.payment.update.mockResolvedValue({ id: "p1", paymentNumber: "PAG-1", client: {} });
+
+      await updatePayment(buildReq({ params: { id: "p1" }, body: { requestId: "req-2" } } as any), createMockRes());
+
+      expect(mockPrisma.payment.update.mock.calls[0][0].data).toMatchObject({ requestId: "req-2", clientId: "c2" });
+    });
+
+    it("rechaza (400) una cotización que no pertenece a la solicitud destino", async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue(existing);
+      mockPrisma.request.findUnique.mockResolvedValue({ id: "req-2", clientId: "c2", status: "RECEPCIONADA" });
+      mockPrisma.quotation.findFirst.mockResolvedValue(null);
+
+      await expect(
+        updatePayment(buildReq({ params: { id: "p1" }, body: { requestId: "req-2", quotationId: "q-de-otra" } } as any), createMockRes())
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("updatePayment", () => {
     it("lanza 404 si el pago no existe", async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(null);
@@ -225,7 +279,33 @@ describe("payments.controller", () => {
       const req = buildReq({ params: { id: "p1" }, body: { status: "COMPLETADO" } } as any);
 
       await expect(changePaymentStatus(req, res)).rejects.toMatchObject({ statusCode: 409 });
-      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
+      expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("responde 409 STATUS_CONFLICT si otra petición ya cambió el estado (no duplica efectos)", async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue({ id: "p1", status: "PENDIENTE", requestId: "req-1", client: {} });
+      mockPrisma.payment.updateMany.mockResolvedValue({ count: 0 });
+      const req = buildReq({ params: { id: "p1" }, body: { status: "COMPLETADO" } } as any);
+
+      await expect(changePaymentStatus(req, createMockRes())).rejects.toMatchObject({ code: "STATUS_CONFLICT" });
+      expect(mockSendTemplateEmail).not.toHaveBeenCalled();
+      expect(mockAdvanceWorkflowStatus).not.toHaveBeenCalled();
+    });
+
+    it("un pago parcial se completa pero NO avanza la solicitud a PAGADO_POR_CLIENTE", async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue({
+        id: "p1", status: "PENDIENTE", requestId: "req-1", paymentNumber: "PAG-1", client: { email: "c@example.com" },
+      });
+      mockPrisma.payment.findUniqueOrThrow.mockResolvedValue({
+        id: "p1", paymentNumber: "PAG-1", amount: 100, currency: "CLP", client: { email: "c@example.com", firstName: "Ana" }, request: { createdBy: "v1" },
+      });
+      mockPrisma.systemConfig.findFirst.mockResolvedValue({ notifyOnPaymentCompleted: true });
+      mockIsRequestFullyPaid.mockResolvedValue(false);
+
+      await changePaymentStatus(buildReq({ params: { id: "p1" }, body: { status: "COMPLETADO" } } as any), createMockRes());
+
+      expect(mockIsRequestFullyPaid).toHaveBeenCalledWith("req-1");
+      expect(mockAdvanceWorkflowStatus).not.toHaveBeenCalled();
     });
 
     it("al completar un pago: actualiza estado, envía email y crea notificación", async () => {
@@ -236,7 +316,7 @@ describe("payments.controller", () => {
         paymentNumber: "PAG-1",
         client: { email: "cliente@example.com" },
       });
-      mockPrisma.payment.update.mockResolvedValue({
+      mockPrisma.payment.findUniqueOrThrow.mockResolvedValue({
         id: "p1",
         paymentNumber: "PAG-1",
         amount: 500,
@@ -250,9 +330,10 @@ describe("payments.controller", () => {
 
       await changePaymentStatus(req, res);
 
-      expect(mockPrisma.payment.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: "COMPLETADO" } })
-      );
+      expect(mockPrisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { id: "p1", status: "PENDIENTE" },
+        data: { status: "COMPLETADO" },
+      });
       expect(mockSendTemplateEmail).toHaveBeenCalledWith(
         expect.objectContaining({ type: "PAYMENT_CONFIRMED", to: "cliente@example.com" })
       );
@@ -272,7 +353,7 @@ describe("payments.controller", () => {
         paymentNumber: "PAG-1",
         client: { email: "cliente@example.com" },
       });
-      mockPrisma.payment.update.mockResolvedValue({
+      mockPrisma.payment.findUniqueOrThrow.mockResolvedValue({
         id: "p1",
         paymentNumber: "PAG-1",
         amount: 500,
@@ -297,7 +378,7 @@ describe("payments.controller", () => {
         paymentNumber: "PAG-1",
         client: { email: "cliente@example.com" },
       });
-      mockPrisma.payment.update.mockResolvedValue({
+      mockPrisma.payment.findUniqueOrThrow.mockResolvedValue({
         id: "p1",
         paymentNumber: "PAG-1",
         amount: 500,
