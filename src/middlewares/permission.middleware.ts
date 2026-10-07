@@ -29,3 +29,28 @@ export function requirePermission(permission: Permission) {
     next();
   };
 }
+
+/** Deja pasar si el usuario tiene al menos uno de los permisos indicados. */
+export function requireAnyPermission(...permissions: Permission[]) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      sendError(res, "No autenticado", "UNAUTHORIZED", 401);
+      return;
+    }
+
+    const { id, role, agencyRole } = req.user;
+    for (const permission of permissions) {
+      if (await hasPermissionAsync(prisma, id, role, agencyRole, permission)) {
+        next();
+        return;
+      }
+    }
+
+    sendError(
+      res,
+      "No tienes los permisos necesarios para realizar esta acción.",
+      "FORBIDDEN",
+      403
+    );
+  };
+}
