@@ -12,6 +12,7 @@ import { sendEmail } from "../services/email.service";
 import { getEffectivePermissions } from "../config/permissions";
 import { logger } from "../utils/logger";
 import { passwordPolicyIssue } from "../utils/password-policy";
+import { escapeHtml } from "../utils/html";
 
 export async function register(req: Request, res: Response): Promise<void> {
   if (!env.ALLOW_PUBLIC_REGISTRATION) {
@@ -275,14 +276,6 @@ export async function inviteUser(req: Request, res: Response): Promise<void> {
 }
 
 const INVITE_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 // 🔐 Función auxiliar para generar un token seguro de recuperación
 function generateResetToken(): string {

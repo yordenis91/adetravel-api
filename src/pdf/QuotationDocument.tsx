@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import type { AgencyHeader } from "../services/agency.service";
 
 const NAVY = "#0F1E3C";
 const GOLD = "#C9A84C";
@@ -40,18 +41,20 @@ interface QuotationDocumentProps {
   taxAmount: number;
   total: number;
   notes?: string | null;
+  agency: AgencyHeader;
 }
 
 const fmt = (n: number) => n.toLocaleString("es-CL");
 
-export function QuotationDocument({ quotationNumber, currency, clientName, items, subtotal, taxPercentage, taxAmount, total, notes }: QuotationDocumentProps) {
+export function QuotationDocument({ quotationNumber, currency, clientName, items, subtotal, taxPercentage, taxAmount, total, notes, agency }: QuotationDocumentProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.agencyName}>ADE Travel</Text>
-            <Text>RUT: 76.XXX.XXX-X</Text>
+            <Text style={styles.agencyName}>{agency.name}</Text>
+            {agency.rut ? <Text>RUT: {agency.rut}</Text> : null}
+            {agency.contact ? <Text>{agency.contact}</Text> : null}
           </View>
           <Text>Fecha: {new Date().toLocaleDateString("es-CL")}</Text>
         </View>
