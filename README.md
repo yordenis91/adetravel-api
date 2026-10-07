@@ -26,6 +26,12 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
 6. Ejecutar en desarrollo:
    - `npm run dev`
 
+## Tests
+
+- `npm test`: unitarios (sin base de datos) y, si hay una base migrada en `DATABASE_URL`, también los e2e.
+- `npm run test:e2e`: solo los e2e (`__tests__/*.e2e.test.ts`) contra un Postgres 17 local desechable. El script crea o arranca el contenedor `adtv-dev-pg` (127.0.0.1:55432), aplica las migraciones y corre los tests. Ignora el `DATABASE_URL` del entorno para no tocar una base real; para usar otra define `TEST_DATABASE_URL` (solo local y con nombre terminado en `_test`).
+- Si un e2e falla con `The table public.users does not exist`, la base no tiene migraciones: usa `npm run test:e2e`.
+
 ## Endpoints base
 - API base: `http://localhost:3000/api`
 - Health: `GET /health`
