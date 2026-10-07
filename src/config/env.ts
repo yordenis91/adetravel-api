@@ -12,7 +12,10 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
-  RATE_LIMIT_MAX: z.coerce.number().default(100),
+  // Límite global de /api por usuario (por IP si no hay sesión). Cada pantalla del cliente hace
+  // 7-14 llamadas y las notificaciones se consultan cada 30 s: con 100 por ventana un uso normal
+  // agotaba el cupo en unas 12 pantallas y el usuario era expulsado (fase 3, defecto D2).
+  RATE_LIMIT_MAX: z.coerce.number().default(1000),
   RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().default(15),
   // Límite propio de /auth/login: solo cuenta intentos fallidos por IP.
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(10),

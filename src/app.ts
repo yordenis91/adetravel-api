@@ -43,7 +43,7 @@ const healthCheck = async (_req: express.Request, res: express.Response) => {
 // authMiddleware de apiRouter) para que no requiera autenticación.
 //
 // Registradas ANTES del rate limiter a propósito: Easypanel hace polling
-// periódico de este endpoint, y si comparte el límite global (100 req/15min)
+// periódico de este endpoint, y si comparte el límite global (RATE_LIMIT_MAX)
 // con el resto de la API, el propio health check puede terminar devolviendo
 // 429 — Easypanel lo interpreta como contenedor caído y lo reinicia sin que
 // haya ningún problema real. Esto probablemente contribuyó a la inestabilidad
