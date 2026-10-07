@@ -24,6 +24,16 @@ describe("errorHandler", () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it("responde 409 DUPLICATE_RECORD ante una violación de unicidad de Prisma (P2002) y NO reporta a Sentry", () => {
+    const res = createMockRes();
+
+    errorHandler({ code: "P2002", meta: { target: ["quotationNumber"] } }, {} as Request, res as unknown as Response, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "DUPLICATE_RECORD" }));
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
   it("responde 400 VALIDATION_ERROR para un ZodError y NO reporta a Sentry", () => {
     const res = createMockRes();
     const zodError = z.object({ name: z.string() }).safeParse({});

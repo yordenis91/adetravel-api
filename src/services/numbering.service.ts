@@ -12,25 +12,42 @@ const entityFieldMap: Record<NumberingEntity, string> = {
   Confirmation: "confirmationNumber"
 };
 
+/**
+ * Siguiente correlativo de un mes: mayor secuencia ya usada con ese prefijo + 1.
+ * Antes era `cantidad de registros del mes + 1`, que repetía un número existente en cuanto se
+ * borraba un registro (con 0001, 0002 y 0003, borrar el 0001 hacía que el siguiente fuera
+ * 0003 otra vez) y la creación fallaba por la restricción única.
+ */
+export function nextSequence(existingNumbers: string[], base: string): number {
+  let max = 0;
+  for (const number of existingNumbers) {
+    if (!number.startsWith(base)) continue;
+    const seq = Number(number.slice(base.length));
+    if (Number.isInteger(seq) && seq > max) max = seq;
+  }
+  return max + 1;
+}
+
 export async function generateNumber(entity: NumberingEntity, prefix: string): Promise<string> {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
-  const start = new Date(`${year}-${month}-01T00:00:00.000Z`);
-  const end = new Date(Date.UTC(year, now.getMonth() + 1, 1));
+  const base = `${prefix}-${year}-${month}-`;
 
   const modelKey = entity.charAt(0).toLowerCase() + entity.slice(1);
   const model = prisma[modelKey as keyof typeof prisma];
-  if (!model || typeof model !== "object" || !("count" in model)) {
+  if (!model || typeof model !== "object" || !("findMany" in model)) {
     throw new ApiError("Entidad de numeración no soportada", 400, "INVALID_NUMBERING_ENTITY");
   }
 
-  const count = await (model as { count: (args: object) => Promise<number> }).count({
-    where: { createdAt: { gte: start, lt: end } }
+  const field = entityFieldMap[entity];
+  const rows = await (model as unknown as { findMany: (args: object) => Promise<Record<string, string>[]> }).findMany({
+    where: { [field]: { startsWith: base } },
+    select: { [field]: true }
   });
 
-  const seq = String(count + 1).padStart(4, "0");
-  return `${prefix}-${year}-${month}-${seq}`;
+  const seq = String(nextSequence(rows.map((row) => row[field]), base)).padStart(4, "0");
+  return `${base}${seq}`;
 }
 
 export function getNumberField(entity: NumberingEntity): string {

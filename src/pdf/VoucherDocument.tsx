@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import type { AgencyHeader } from "../services/agency.service";
 
 const NAVY = "#0F1E3C";
 const GOLD = "#C9A84C";
@@ -45,20 +46,22 @@ interface VoucherDocumentProps {
   notes?: string | null;
   amount?: number | null;
   currency?: string | null;
+  agency: AgencyHeader;
 }
 
 export function VoucherDocument({
   voucherNumber, status, serviceType, serviceName, serviceDetails, destination,
   checkIn, checkOut, clientName, providerName, passengerNames, confirmationCode,
-  notes, amount, currency,
+  notes, amount, currency, agency,
 }: VoucherDocumentProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.agencyName}>ADE Travel</Text>
-            <Text>RUT: 76.XXX.XXX-X</Text>
+            <Text style={styles.agencyName}>{agency.name}</Text>
+            {agency.rut ? <Text>RUT: {agency.rut}</Text> : null}
+            {agency.contact ? <Text>{agency.contact}</Text> : null}
           </View>
           <Text>Fecha: {new Date().toLocaleDateString("es-CL")}</Text>
         </View>

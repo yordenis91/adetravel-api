@@ -10,6 +10,7 @@ import { calculateTotals, normalizeItems } from "../services/quotation.calc";
 import { advanceWorkflowStatus } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/quotations.validator";
 import { buildQuotationHtml, generateQuotationPdfBuffer } from "../services/pdf.service";
+import { getAgencyHeader } from "../services/agency.service";
 
 export async function listQuotations(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -44,6 +45,12 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   if (!parentRequest) throw new ApiError("Solicitud no encontrada", 404);
   if (["VENDIDA", "CANCELADA"].includes(parentRequest.status)) {
     throw new ApiError(`No se pueden agregar cotizaciones a una solicitud en estado "${parentRequest.status}"`, 409);
+  }
+
+  // 1a. La cotización es del cliente de la solicitud (igual que en Pagos): sin esto se podría
+  // cotizar la solicitud de un cliente a nombre de otro y enviarle el correo equivocado.
+  if (data.clientId !== parentRequest.clientId) {
+    throw new ApiError("El cliente no corresponde al de la solicitud indicada", 400, "CLIENT_REQUEST_MISMATCH");
   }
 
   // 1b. Si se indica un Servicio, debe pertenecer a la misma Solicitud (regla de "Paquete": si
@@ -207,7 +214,7 @@ export async function previewQuotation(req: Request, res: Response): Promise<voi
   const quotation = await prisma.quotation.findUnique({ where: { id }, include: { client: true } });
   if (!quotation) throw new ApiError("Cotización no encontrada", 404);
 
-  const html = buildQuotationHtml(quotation);
+  const html = buildQuotationHtml(quotation, await getAgencyHeader());
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(html);
 }

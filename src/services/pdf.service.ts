@@ -4,12 +4,14 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { QuotationItem } from "./quotation.calc";
 import { QuotationDocument } from "../pdf/QuotationDocument";
 import { VoucherDocument } from "../pdf/VoucherDocument";
+import { AgencyHeader, getAgencyHeader } from "./agency.service";
+import { escapeHtml } from "../utils/html";
 
-export function buildQuotationHtml(data: any): string {
+export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
   const itemsRows = data.items.map((item: QuotationItem) => `
     <tr>
-      <td class="item-service">${item.service}</td>
-      <td class="item-desc">${item.description}</td>
+      <td class="item-service">${escapeHtml(item.service)}</td>
+      <td class="item-desc">${escapeHtml(item.description)}</td>
       <td class="item-qty center">${item.quantity}</td>
       <td class="item-price right">${data.currency} ${item.unitPrice.toLocaleString("es-CL")}</td>
       <td class="item-total right">${data.currency} ${item.total.toLocaleString("es-CL")}</td>
@@ -20,7 +22,7 @@ export function buildQuotationHtml(data: any): string {
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Cotización ${data.quotationNumber}</title>
+  <title>Cotización ${escapeHtml(data.quotationNumber)}</title>
   <style>
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1a1a2e; padding: 40px; font-size: 12px; }
     .header { border-bottom: 3px solid #0F1E3C; padding-bottom: 24px; margin-bottom: 40px; display: flex; justify-content: space-between; }
@@ -37,12 +39,16 @@ export function buildQuotationHtml(data: any): string {
 </head>
 <body>
   <div class="header">
-    <div><div class="agency-name">ADE Travel</div><br>RUT: 76.XXX.XXX-X</div>
+    <div>
+      <div class="agency-name">${escapeHtml(agency.name)}</div>
+      ${agency.rut ? `<div>RUT: ${escapeHtml(agency.rut)}</div>` : ""}
+      ${agency.contact ? `<div>${escapeHtml(agency.contact)}</div>` : ""}
+    </div>
     <div style="text-align:right">Fecha: ${new Date().toLocaleDateString("es-CL")}</div>
   </div>
   <div class="doc-title">Cotización de Servicios</div>
-  <div class="doc-number">${data.quotationNumber}</div>
-  <p><strong>Cliente:</strong> ${data.client.firstName} ${data.client.lastName}</p>
+  <div class="doc-number">${escapeHtml(data.quotationNumber)}</div>
+  <p><strong>Cliente:</strong> ${escapeHtml(data.client.firstName)} ${escapeHtml(data.client.lastName)}</p>
   <br>
   <table>
     <thead><tr><th>Servicio</th><th>Descripción</th><th class="center">Cant.</th><th class="right">P. Unit.</th><th class="right">Total</th></tr></thead>
@@ -54,7 +60,7 @@ export function buildQuotationHtml(data: any): string {
     <tr class="total-row"><td>TOTAL</td><td class="right">${data.currency} ${data.total.toLocaleString("es-CL")}</td></tr>
   </table>
   <div style="clear:both"></div>
-  ${data.notes ? `<h4>Notas</h4><p>${data.notes}</p>` : ''}
+  ${data.notes ? `<h4>Notas</h4><p>${escapeHtml(data.notes)}</p>` : ''}
 </body>
 </html>`;
 }
@@ -71,6 +77,7 @@ export async function generateQuotationPdfBuffer(quotation: any): Promise<Buffer
     taxAmount: quotation.taxAmount ?? 0,
     total: quotation.total ?? 0,
     notes: quotation.notes,
+    agency: await getAgencyHeader(),
   });
   return renderToBuffer(element as never);
 }
@@ -93,6 +100,7 @@ export async function generateVoucherPdfBuffer(voucher: any): Promise<Buffer> {
     notes: voucher.notes,
     amount: voucher.amount,
     currency: voucher.currency,
+    agency: await getAgencyHeader(),
   });
   return renderToBuffer(element as never);
 }

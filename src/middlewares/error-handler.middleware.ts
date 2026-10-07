@@ -21,6 +21,13 @@ export function errorHandler(
     return;
   }
 
+  // Violación de restricción única de Prisma (p.ej. dos altas simultáneas que obtuvieron el
+  // mismo correlativo): es un conflicto reintentable, no un error del servidor.
+  if (typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2002") {
+    sendError(res, "El registro ya existe o se creó al mismo tiempo. Intenta de nuevo.", "DUPLICATE_RECORD", 409);
+    return;
+  }
+
   logger.error({ err }, "Unhandled error");
   Sentry.captureException(err);
   sendError(res, "Error interno del servidor", "INTERNAL_SERVER_ERROR", 500);
