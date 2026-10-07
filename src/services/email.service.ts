@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { prisma } from "../lib/prisma";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
+import { decryptPII } from "../lib/pii-encryption";
 
 async function resolveSmtpSettings() {
   const config = await prisma.systemConfig.findFirst();
@@ -9,7 +10,8 @@ async function resolveSmtpSettings() {
   const host = config?.smtpHost || env.SMTP_HOST;
   const port = config?.smtpPort || env.SMTP_PORT;
   const user = config?.smtpUser || env.SMTP_USER;
-  const pass = config?.smtpPassword || env.SMTP_PASS;
+  // Guardada cifrada; decryptPII devuelve tal cual una contraseña antigua aún en texto plano.
+  const pass = decryptPII(config?.smtpPassword) || env.SMTP_PASS;
   const fromEmail = config?.smtpFromEmail || env.SMTP_FROM;
   const fromName = config?.smtpFromName;
   // La config guardada en la app (SystemConfig) manda sobre las variables de
