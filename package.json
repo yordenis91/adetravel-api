@@ -18,8 +18,11 @@
     "seed:flow": "ts-node prisma/seed-flow.ts",
     "seed:all": "npm run seed:admin && npm run seed:users && npm run seed:config && npm run seed:catalogs && npm run seed:clients && npm run seed:providers && npm run seed:flow",
     "pii:encrypt-backfill": "ts-node prisma/scripts/encrypt-existing-client-pii.ts",
+    "pii:rotate-key": "ts-node prisma/scripts/rotate-pii-key.ts",
+    "smtp:encrypt-password": "ts-node prisma/scripts/encrypt-smtp-password.ts",
     "test": "jest --passWithNoTests",
-    "test:e2e": "bash scripts/test-e2e.sh"
+    "test:e2e": "bash scripts/test-e2e.sh",
+    "restore:drill": "bash scripts/restore-drill.sh"
   },
   "keywords": [
     "node",
@@ -49,6 +52,7 @@
     "pg": "^8.20.0",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2",
+    "prisma": "^7.10.0",
     "react": "^18.3.1",
     "zod": "^4.1.12"
   },
@@ -63,10 +67,13 @@
     "@types/react": "^18.3.12",
     "@types/supertest": "^6.0.3",
     "jest": "^30.2.0",
-    "prisma": "^7.10.0",
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "mysql2": "^3.24.5",
+    "deepmerge-ts": "^8.0.2"
   }
 }

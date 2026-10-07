@@ -2,6 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 import { createActivityLog } from "../src/services/activity-log.service";
 import { getAdminUser } from "./seed-helpers";
+import { assertDemoSeedAllowed } from "./seed-guard";
 
 const providers = [
   {
@@ -175,6 +176,7 @@ const providers = [
 ];
 
 async function main() {
+  assertDemoSeedAllowed("seed-providers");
   console.log("🌱 Iniciando seed de proveedores...");
 
   // Igual que Clientes: se registran "como si los hubiera cargado el administrador"

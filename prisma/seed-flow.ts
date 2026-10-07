@@ -4,6 +4,7 @@ import { prisma } from "../src/lib/prisma";
 import { createActivityLog } from "../src/services/activity-log.service";
 import { generateNumber } from "../src/services/numbering.service";
 import { getAdminUser, daysAgo, daysFromNow, toDateInput } from "./seed-helpers";
+import { assertDemoSeedAllowed } from "./seed-guard";
 
 /**
  * Seed del flujo completo de negocio: Solicitud → Servicio → Cotización → Confirmación → Pago →
@@ -18,6 +19,7 @@ import { getAdminUser, daysAgo, daysFromNow, toDateInput } from "./seed-helpers"
  */
 
 async function main() {
+  assertDemoSeedAllowed("seed-flow");
   console.log("🌱 Iniciando seed del flujo de negocio (Solicitudes/Servicios/...)...");
 
   const admin = await getAdminUser();

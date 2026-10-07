@@ -22,7 +22,8 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
    - `npm run prisma:migrate`
 5. Crear usuario administrador inicial:
    - `npm run seed:admin`
-   - El seed usa las variables `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_FULL_NAME`, `ADMIN_AGENCY_ROLE` si están definidas.
+   - `ADMIN_EMAIL` y `ADMIN_PASSWORD` son **obligatorias** (no hay valores por defecto) y la contraseña debe cumplir la política (8+ caracteres, mayúscula, número y uno de `!@#$%^&*`). Opcionales: `ADMIN_FULL_NAME`, `ADMIN_AGENCY_ROLE`. La contraseña no se imprime.
+   - Los seeds de datos de ejemplo (`seed:users`, `seed:clients`, `seed:providers`, `seed:flow`) se niegan a correr con `NODE_ENV=production` salvo `ALLOW_DEMO_SEED=true`. Los usuarios de prueba usan `SEED_USERS_PASSWORD` o, solo fuera de producción, `Agencia123!`.
 6. Ejecutar en desarrollo:
    - `npm run dev`
 

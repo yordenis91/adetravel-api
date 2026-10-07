@@ -54,12 +54,19 @@ y, si pasa, se pueda resolver en minutos sin tocar el Dockerfile.
 
 ## Cómo recuperarse de una migración fallida (P3009)
 
-Si un deploy falla con algo como:
+El **primer** despliegue con una migración que falla muestra `Error: P3018` (con el error de
+Postgres, p. ej. `division by zero`). A partir de ahí, cada reintento falla con:
 
 ```
 Error: P3009
 The `X_migration_name` migration started but failed.
 ```
+
+**Ojo: Prisma no ejecuta cada migración dentro de una transacción.** Si falla a mitad, lo que se
+ejecutó antes del error **queda aplicado** (ensayado: la tabla y la columna creadas antes del fallo
+seguían ahí). Por eso las migraciones nuevas de este repo van envueltas en `BEGIN; … COMMIT;`: con
+eso Postgres lo deshace todo y el caso se reduce a "no se aplicó nada". No usar `BEGIN/COMMIT` si la
+migración lleva `CREATE INDEX CONCURRENTLY` (no admite transacción).
 
 Seguir este runbook (ya no hace falta tocar el `CMD` del Dockerfile):
 
@@ -83,6 +90,20 @@ Seguir este runbook (ya no hace falta tocar el `CMD` del Dockerfile):
 base — no automatizar esto a ciegas. Marcar `--applied` una migración que
 en realidad no corrió (o viceversa) puede dejar el esquema desincronizado
 de forma silenciosa.
+
+**Comprobación final:** tras recuperar, `npx prisma migrate diff --from-config-datasource
+--to-schema prisma/schema.prisma --exit-code` debe salir con código 0 (esquema y base idénticos).
+
+**Ensayo registrado (2026-10-07, copia de una base sembrada):**
+
+1. Migración de prueba que crea una tabla, añade una columna y luego falla (`SELECT 1/0`).
+   Primer despliegue: `P3018`; reintento: `P3009`. En `_prisma_migrations` quedó con
+   `finished_at` y `rolled_back_at` en `NULL`, y la tabla y la columna **sí existían**.
+2. Se revirtieron a mano (`DROP TABLE`, `DROP COLUMN`), `migrate resolve --rolled-back`, se corrigió
+   el `.sql` y el despliegue siguiente la aplicó; el tercero no tuvo nada pendiente. Sin pérdida de
+   datos.
+3. La misma migración envuelta en `BEGIN/COMMIT`: al fallar no quedó nada aplicado; bastó con
+   `resolve --rolled-back` y corregirla.
 
 ## Backups y recuperación ante desastres
 
@@ -155,6 +176,43 @@ base de prueba primero.
    `PII_ENCRYPTION_KEY` en el entorno de destino es la misma que estaba
    vigente cuando se generó ese backup (ver advertencia arriba).
 
+### Ensayo de restauración automatizado (`npm run restore:drill`)
+
+Comprueba de punta a punta que el último backup sirve, sin tocar la base real:
+
+1. Descarga el dump más reciente de `BACKUP_S3_BUCKET` (avisa si tiene más de 26 h).
+2. Lo restaura en `adetravel_restore_test`, una base desechable dentro del contenedor local de
+   Postgres `adtv-dev-pg` (`npm run test:e2e` lo crea).
+3. Verifica migraciones (y que no haya ninguna a medias), filas por tabla, que exista un
+   administrador activo y que **cada** campo de PII cifrado se descifre con `PII_ENCRYPTION_KEY`.
+   Si la contraseña SMTP está guardada, comprueba también que se descifra.
+4. Borra la base restaurada (`KEEP_RESTORE_DB=1` para conservarla) y el archivo descargado.
+
+Nunca imprime datos, solo conteos. Sale con código 1 si algo falla.
+
+Credenciales en `.env.restore` en la raíz del repo (ignorado por git; las variables del entorno
+tienen prioridad sobre el archivo):
+
+```bash
+BACKUP_S3_ENDPOINT=...
+BACKUP_S3_BUCKET=...
+BACKUP_S3_ACCESS_KEY_ID=...
+BACKUP_S3_SECRET_ACCESS_KEY=...
+PII_ENCRYPTION_KEY=...   # la de Vaultwarden vigente cuando se hizo el backup
+```
+
+**Frecuencia recomendada:** una vez al mes y siempre después de rotar `PII_ENCRYPTION_KEY`.
+
+**Dónde está la clave:** `PII_ENCRYPTION_KEY` se guarda en el Vaultwarden del administrador
+(confirmado el 2026-10-07). La API corre con una sola réplica en Easypanel, así que los trabajos
+programados (avisos y backup) no se duplican.
+
+**Ensayo registrado (2026-10-07, en local):** backup real de la app (`runDatabaseBackupJob` desde la
+imagen Docker) de una base sembrada a un MinIO local → `npm run restore:drill`: 8 migraciones, filas
+idénticas a la base de origen, 30 de 30 campos de PII descifrados; con una clave distinta, 0 de 30 y
+`FALLA`; la API arrancó sobre la base restaurada, inició sesión y devolvió los 10 clientes con el
+pasaporte legible. Falta repetirlo contra el bucket real de la demo.
+
 ### Qué NO cubre esto (para una vuelta futura)
 
 - **No hay cifrado adicional del dump en sí** más allá de lo que el bucket
@@ -162,7 +220,7 @@ base de prueba primero.
   esté configurado el bucket/MinIO). El dump de un cliente con muchos datos
   personales (nombre, email, teléfono) igual conviene tratarlo como
   sensible aunque el pasaporte/cuenta bancaria ya vengan cifrados.
-- **No hay verificación automática de que el backup restaura bien** —
+- **No hay verificación periódica automática de que el backup restaura bien** (sí hay un ensayo manual, `npm run restore:drill`, arriba) —
   hoy es un procedimiento manual (la sección de arriba). Una mejora futura
   razonable es un job separado que periódicamente restaure el último
   backup a una base descartable y falle ruidosamente si no puede.

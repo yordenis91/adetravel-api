@@ -35,6 +35,11 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("true")
     .transform((v) => v === "true"),
+  // Salvaguarda de correo por entorno. "live": se envía a los destinatarios reales (producción).
+  // "redirect": todo va a EMAIL_REDIRECT_TO, con el destinatario original en el asunto (demo y
+  // pruebas con datos que pueden ser reales). "off": no se envía nada, solo se registra.
+  EMAIL_DELIVERY: z.enum(["live", "redirect", "off"]).default("live"),
+  EMAIL_REDIRECT_TO: z.string().email().optional(),
   SENTRY_DSN: z.string().optional(),
   // Clave AES-256 (32 bytes en hex, 64 caracteres) para cifrar PII sensible
   // de Cliente (pasaporte, cuenta bancaria) en reposo. Ver src/lib/pii-encryption.ts.
@@ -55,5 +60,19 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   throw new Error(`Invalid environment variables: ${parsed.error.message}`);
 }
+if (parsed.data.EMAIL_DELIVERY === "redirect" && !parsed.data.EMAIL_REDIRECT_TO) {
+  throw new Error("Invalid environment variables: EMAIL_DELIVERY=redirect exige EMAIL_REDIRECT_TO");
+}
 
 export const env = parsed.data;
+
+/**
+ * Motivo por el que JWT_SECRET parece débil, o null. No impide arrancar (un secreto corto en
+ * producción no debe tumbar el servicio en un despliegue), pero se avisa en el log al iniciar.
+ * Con HS256, un secreto corto o repetitivo permite falsificar sesiones por fuerza bruta.
+ */
+export function weakJwtSecretReason(secret: string): string | null {
+  if (secret.length < 32) return `tiene ${secret.length} caracteres (mínimo recomendado: 32)`;
+  if (new Set(secret).size < 10) return "tiene muy pocos caracteres distintos";
+  return null;
+}

@@ -96,6 +96,8 @@ model User {
   isActive             Boolean        @default(true)
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
+  /// Se incrementa al cambiar o restablecer la contraseña: invalida los tokens emitidos antes.
+  tokenVersion         Int            @default(0)
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   tasks                Task[]
@@ -103,6 +105,15 @@ model User {
   userPermissions      UserPermission[]
 
   @@map("users")
+}
+
+/// Tokens cerrados con logout (por jti) hasta que caducan. Persistido para que sobreviva a los despliegues.
+model RevokedToken {
+  jti       String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@map("revoked_tokens")
 }
 
 model Client {
@@ -204,6 +215,9 @@ model Request {
   servicesList  Service[]
   confirmations Confirmation[]
 
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
   @@map("requests")
 }
 
@@ -229,6 +243,8 @@ model Service {
   quotations    Quotation[]
   confirmations Confirmation[]
 
+  @@index([requestId])
+  @@index([createdAt])
   @@map("services")
 }
 
@@ -258,6 +274,9 @@ model Quotation {
   client   Client    @relation(fields: [clientId], references: [id])
   payments Payment[]
 
+  @@index([requestId])
+  @@index([clientId])
+  @@index([createdAt])
   @@map("quotations")
 }
 
@@ -280,6 +299,7 @@ model Confirmation {
   service  Service? @relation(fields: [serviceId], references: [id])
   provider Provider @relation(fields: [providerId], references: [id])
 
+  @@index([requestId])
   @@map("confirmations")
 }
 
@@ -304,6 +324,10 @@ model Payment {
   quotation Quotation? @relation(fields: [quotationId], references: [id])
   client    Client     @relation(fields: [clientId], references: [id])
 
+  @@index([requestId])
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
   @@map("payments")
 }
 
@@ -333,6 +357,8 @@ model Voucher {
   client   Client    @relation(fields: [clientId], references: [id])
   provider Provider? @relation(fields: [providerId], references: [id])
 
+  @@index([requestId])
+  @@index([createdAt])
   @@map("vouchers")
 }
 
@@ -348,6 +374,8 @@ model ActivityLog {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([entityType, entityId])
+  @@index([createdAt])
   @@map("activity_logs")
 }
 

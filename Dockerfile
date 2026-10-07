@@ -1,3 +1,26 @@
+# --- Etapa 1: compilar ---------------------------------------------------------
+# Instala todas las dependencias (incluidas las de desarrollo: TypeScript, tipos),
+# genera el cliente de Prisma y compila a dist/. Nada de esta etapa llega a la imagen
+# final salvo dist/.
+FROM node:22-alpine AS builder
+
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY prisma ./prisma/
+COPY prisma.config.ts ./
+RUN npm ci
+
+# prisma.config.ts exige DATABASE_URL aunque `generate` no se conecte a la base.
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npx prisma generate
+
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# --- Etapa 2: imagen de producción ---------------------------------------------
 FROM node:22-alpine
 
 # tini como PID 1: reenvía correctamente SIGTERM al proceso real (npm no lo
@@ -18,23 +41,24 @@ FROM node:22-alpine
 # actualizar también este paquete.
 RUN apk add --no-cache openssl tini postgresql17-client
 
+ENV NODE_ENV=production
 WORKDIR /app
 
-# Copiar archivos de configuración de dependencias y base de datos
+# Solo dependencias de producción. `prisma` (el CLI) es dependencia de producción
+# porque el arranque corre `prisma migrate deploy`.
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
+RUN npm ci --omit=dev \
+  && DATABASE_URL=postgresql://build:build@localhost:5432/build npx prisma generate \
+  && npm cache clean --force
 
-# Instalamos las dependencias necesarias para compilar TypeScript
-RUN npm ci
+COPY --from=builder /app/dist ./dist
 
-# Generar el cliente de Prisma para interactuar con PostgreSQL
-RUN npx prisma generate
-
-# 🔥 LA CORRECCIÓN: Copiar todo el código fuente en una sola línea válida
-COPY . .
-
-# Compilar el proyecto TypeScript (esto creará la carpeta /app/dist/)
-RUN npm run build
+# Sin root: el proceso corre como el usuario `node` de la imagen oficial. /app queda
+# de root y solo lectura para él (no se hace chown: duplicaría node_modules en otra
+# capa, ~440 MB). Solo escribe en /tmp (dumps temporales del backup) y en su $HOME.
+USER node
 
 EXPOSE 3000
 
@@ -54,5 +78,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
 
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Arrancar las migraciones automáticas y encender el servidor Express
+# Aplicar las migraciones pendientes y arrancar el servidor Express.
 CMD ["npm", "run", "start"]

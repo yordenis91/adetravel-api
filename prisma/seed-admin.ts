@@ -2,14 +2,14 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { AgencyRole } from "@prisma/client";
 import { prisma } from "../src/lib/prisma";
+import { resolveAdminCredentials } from "./seed-guard";
 
-const email = process.env.ADMIN_EMAIL || "admin@adetravel.local";
-const password = process.env.ADMIN_PASSWORD || "Admin123!";
 const fullName = process.env.ADMIN_FULL_NAME || "Administrador AdeTravel";
 const agencyRole = (process.env.ADMIN_AGENCY_ROLE as AgencyRole) || AgencyRole.GERENTE;
 
 async function main() {
-  const normalizedEmail = email.toLowerCase().trim();
+  // Sin valores por defecto: un administrador con contraseña conocida sería una puerta abierta.
+  const { email: normalizedEmail, password } = resolveAdminCredentials();
   const existingAdmin = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
   if (existingAdmin) {
@@ -33,7 +33,7 @@ async function main() {
   });
 
   console.log(`Administrador creado: ${admin.email} (ID: ${admin.id})`);
-  console.log(`Contraseña inicial: ${password}`);
+  // La contraseña no se imprime: los logs del contenedor no deben contener credenciales.
 }
 
 main()
