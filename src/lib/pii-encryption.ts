@@ -17,8 +17,9 @@ const ALGORITHM = "aes-256-gcm";
 const VERSION_PREFIX = "v1";
 const IV_LENGTH = 12; // recomendado para GCM
 
-function getKey(): Buffer {
-  const hex = process.env.PII_ENCRYPTION_KEY;
+function getKey(hexOverride?: string): Buffer {
+  // hexOverride: clave explícita (rotación de clave); si no, la del entorno.
+  const hex = hexOverride ?? process.env.PII_ENCRYPTION_KEY;
   if (!hex) {
     throw new Error("PII_ENCRYPTION_KEY no está configurada");
   }
@@ -29,18 +30,18 @@ function getKey(): Buffer {
   return key;
 }
 
-export function encryptPII(value: string | null | undefined): string | null {
+export function encryptPII(value: string | null | undefined, keyHex?: string): string | null {
   if (value === null || value === undefined || value === "") return value ?? null;
 
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, getKey(), iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, getKey(keyHex), iv);
   const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   return [VERSION_PREFIX, iv.toString("base64"), authTag.toString("base64"), ciphertext.toString("base64")].join(":");
 }
 
-export function decryptPII(value: string | null | undefined): string | null {
+export function decryptPII(value: string | null | undefined, keyHex?: string): string | null {
   if (value === null || value === undefined || value === "") return value ?? null;
 
   const parts = value.split(":");
@@ -57,7 +58,7 @@ export function decryptPII(value: string | null | undefined): string | null {
     const authTag = Buffer.from(authTagB64, "base64");
     const ciphertext = Buffer.from(ciphertextB64, "base64");
 
-    const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, getKey(keyHex), iv);
     decipher.setAuthTag(authTag);
     const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     return plaintext.toString("utf8");
