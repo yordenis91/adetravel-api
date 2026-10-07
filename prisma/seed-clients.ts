@@ -2,6 +2,7 @@ import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 import { createActivityLog } from "../src/services/activity-log.service";
 import { getAdminUser } from "./seed-helpers";
+import { assertDemoSeedAllowed } from "./seed-guard";
 
 const clients = [
   {
@@ -227,6 +228,7 @@ const clients = [
 ];
 
 async function main() {
+  assertDemoSeedAllowed("seed-clients");
   console.log("🌱 Iniciando seed de clientes...");
 
   // Todos los clientes se insertan "como si los hubiera registrado el administrador" desde el
