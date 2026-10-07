@@ -169,6 +169,10 @@ export async function grantUserPermission(req: Request, res: Response): Promise<
     where: { userId_permission: { userId, permission } },
   });
 
+  if (previous?.effect === "DENY" && userId === req.user!.id) {
+    throw new ApiError("No puedes modificar una denegación que se te aplicó", 403, "CANNOT_MODIFY_OWN_DENY");
+  }
+
   const data = {
     effect,
     expiresAt: expiresAt ? new Date(expiresAt) : null,
@@ -200,6 +204,10 @@ export async function revokeUserPermission(req: Request, res: Response): Promise
     where: { userId_permission: { userId, permission } },
   });
   if (!existing) throw new ApiError("El usuario no tiene una excepción para ese permiso", 404, "GRANT_NOT_FOUND");
+
+  if (existing.effect === "DENY" && userId === req.user!.id) {
+    throw new ApiError("No puedes quitarte una denegación que se te aplicó", 403, "CANNOT_MODIFY_OWN_DENY");
+  }
 
   await prisma.userPermission.delete({ where: { userId_permission: { userId, permission } } });
 

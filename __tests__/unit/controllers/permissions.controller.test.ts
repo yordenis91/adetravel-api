@@ -71,6 +71,18 @@ describe("permissions.controller (denegaciones por usuario)", () => {
       expect(mockPrisma.userPermission.upsert).not.toHaveBeenCalled();
     });
 
+    it("no permite que un usuario pise una denegación que se le aplicó", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: "gerente-1", role: "USUARIO", agencyRole: "GERENTE" });
+      mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY" });
+      await expect(
+        grantUserPermission(
+          req({ params: { userId: "gerente-1" } as any, body: { permission: "MANAGE_SERVICES" }, user: { id: "gerente-1", role: "USUARIO" } as any }),
+          createMockRes()
+        )
+      ).rejects.toMatchObject({ statusCode: 403, code: "CANNOT_MODIFY_OWN_DENY" });
+      expect(mockPrisma.userPermission.upsert).not.toHaveBeenCalled();
+    });
+
     it("otorgar sobre una denegación existente la reemplaza y lo deja en la auditoría", async () => {
       mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY" });
       await grantUserPermission(req({ body: { permission: "MANAGE_SERVICES" } }), createMockRes());
@@ -94,6 +106,14 @@ describe("permissions.controller (denegaciones por usuario)", () => {
       await revokeUserPermission(req({ params }), createMockRes());
       expect(mockPrisma.userPermission.delete).toHaveBeenCalled();
       expect(auditedActions()).toEqual(["USER_PERMISSION_DENY_REMOVED"]);
+    });
+
+    it("no permite quitarse a uno mismo una denegación", async () => {
+      mockPrisma.userPermission.findUnique.mockResolvedValue({ effect: "DENY" });
+      await expect(
+        revokeUserPermission(req({ params: { userId: "gerente-1", permission: "MANAGE_SERVICES" } as any, user: { id: "gerente-1", role: "USUARIO" } as any }), createMockRes())
+      ).rejects.toMatchObject({ statusCode: 403, code: "CANNOT_MODIFY_OWN_DENY" });
+      expect(mockPrisma.userPermission.delete).not.toHaveBeenCalled();
     });
 
     it("quitar una excepción otorgada sigue auditando USER_PERMISSION_REVOKED", async () => {
