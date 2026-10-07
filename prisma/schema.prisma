@@ -383,12 +383,20 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+// GRANT suma un permiso al rol del usuario; DENY quita uno heredado del rol. Una sola fila por
+// usuario y permiso, y DENY siempre gana (ver getEffectivePermissions).
+enum PermissionEffect {
+  GRANT
+  DENY
+}
+
 model UserPermission {
-  id         String    @id @default(uuid())
+  id         String           @id @default(uuid())
   userId     String
   permission String
+  effect     PermissionEffect @default(GRANT)
   grantedBy  String?
-  grantedAt  DateTime  @default(now())
+  grantedAt  DateTime         @default(now())
   expiresAt  DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

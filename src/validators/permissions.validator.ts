@@ -11,6 +11,7 @@ export const setRolePermissionsSchema = z.object({
 
 export const grantUserPermissionSchema = z.object({
   permission: permissionKeySchema,
+  effect: z.enum(["GRANT", "DENY"]).default("GRANT"),
   expiresAt: z.string().datetime().optional(),
 });
 
