@@ -53,3 +53,14 @@ if (parsed.data.EMAIL_DELIVERY === "redirect" && !parsed.data.EMAIL_REDIRECT_TO)
 }
 
 export const env = parsed.data;
+
+/**
+ * Motivo por el que JWT_SECRET parece débil, o null. No impide arrancar (un secreto corto en
+ * producción no debe tumbar el servicio en un despliegue), pero se avisa en el log al iniciar.
+ * Con HS256, un secreto corto o repetitivo permite falsificar sesiones por fuerza bruta.
+ */
+export function weakJwtSecretReason(secret: string): string | null {
+  if (secret.length < 32) return `tiene ${secret.length} caracteres (mínimo recomendado: 32)`;
+  if (new Set(secret).size < 10) return "tiene muy pocos caracteres distintos";
+  return null;
+}

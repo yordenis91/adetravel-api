@@ -2,7 +2,10 @@ import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
+import { isTokenRevoked } from "../lib/auth-tokens";
 
+// Solo para tokens emitidos antes de que existiera el jti (no se pueden revocar en la base).
+// Se pierde al reiniciar, pero esos tokens caducan solos en como mucho JWT_EXPIRES_IN.
 const tokenBlacklist = new Set<string>();
 
 export function blacklistToken(token: string): void {
@@ -13,6 +16,7 @@ interface AuthTokenPayload extends JwtPayload {
   id: string;
   email: string;
   role: "ADMINISTRADOR" | "USUARIO";
+  tv?: number;
 }
 
 export async function authMiddleware(
@@ -65,7 +69,8 @@ export async function authMiddleware(
         fullName: true,
         role: true,
         agencyRole: true,
-        isActive: true
+        isActive: true,
+        tokenVersion: true
       }
     });
 
@@ -85,7 +90,18 @@ export async function authMiddleware(
       return;
     }
 
-    req.user = user;
+    // Un token emitido antes del último cambio de contraseña ya no vale. Los tokens antiguos
+    // sin `tv` cuentan como versión 0: siguen valiendo hasta el primer cambio de contraseña.
+    if ((decoded.tv ?? 0) !== user.tokenVersion || (await isTokenRevoked(decoded.jti))) {
+      res.status(401).json({
+        error: "La sesión ya no es válida. Por favor inicie sesión nuevamente.",
+        code: "TOKEN_REVOKED"
+      });
+      return;
+    }
+
+    const { tokenVersion: _tokenVersion, ...sessionUser } = user;
+    req.user = sessionUser;
     next();
   } catch (error) {
     console.error("Error en authMiddleware:", error);

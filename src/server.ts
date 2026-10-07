@@ -2,7 +2,7 @@
 import "./instrument";
 import * as Sentry from "@sentry/node";
 import { app } from "./app";
-import { env } from "./config/env";
+import { env, weakJwtSecretReason } from "./config/env";
 import { logger } from "./utils/logger";
 import { registerJobs } from "./jobs";
 import { prisma } from "./lib/prisma";
@@ -25,6 +25,11 @@ process.on("uncaughtException", (err) => {
   Sentry.captureException(err);
   process.exit(1);
 });
+
+const jwtSecretIssue = weakJwtSecretReason(env.JWT_SECRET);
+if (jwtSecretIssue) {
+  logger.warn(`JWT_SECRET es débil: ${jwtSecretIssue}. Genera uno con: openssl rand -hex 32`);
+}
 
 const server = app.listen(env.PORT, "0.0.0.0", () => {
   logger.info(`AdeTravel backend running on port ${env.PORT}`);
