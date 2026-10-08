@@ -25,10 +25,16 @@ export const providersQuerySchema = paginationQuerySchema.extend({
 export const providerCreateSchema = z.object({ name: z.string().min(2) }).passthrough();
 export const providerUpdateSchema = providerCreateSchema.partial();
 
+const WORKFLOW_STATUS_VALUES = Object.values(WorkflowStatus) as string[];
+
 export const requestsQuerySchema = paginationQuerySchema.extend({
+  // Uno o varios estados separados por comas (las pestañas del cliente agrupan los estados por fase).
   status: z.preprocess(
-    (val) => (typeof val === "string" ? val.toUpperCase() : val),
-    z.nativeEnum(WorkflowStatus)
+    (val) => (typeof val === "string" ? val.toUpperCase().replace(/\s+/g, "") : val),
+    z.string().refine(
+      (v) => v.split(",").every((s) => WORKFLOW_STATUS_VALUES.includes(s)),
+      "Estado de solicitud inválido"
+    )
   ).optional(),
   clientId: z.string().uuid().optional(),
   search: z.string().optional()

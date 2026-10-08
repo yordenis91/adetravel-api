@@ -12,12 +12,12 @@ import { sendTemplateEmail } from "../services/email.service";
 export async function listRequests(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
   const statusRaw = req.query.status as string | undefined;
-  const status = statusRaw ? statusRaw.toUpperCase() : undefined;
+  const statuses = statusRaw ? statusRaw.toUpperCase().split(",").filter(Boolean) : [];
   const clientId = req.query.clientId as string | undefined;
   const search = req.query.search as string | undefined;
 
   const where = {
-    ...(status ? { status: status as never } : {}),
+    ...(statuses.length ? { status: { in: statuses as never[] } } : {}),
     ...(clientId ? { clientId } : {}),
     ...(search ? {
       OR: [
