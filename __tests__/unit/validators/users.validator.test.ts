@@ -9,15 +9,22 @@ describe("users.validator", () => {
       const result = updateUserSchema.parse({
         fullName: "Nuevo Nombre",
         email: "nuevo@example.com",
-        password: "nuevaPassword123",
+        password: "nuevaPassword123!",
       });
       expect(result.fullName).toBe("Nuevo Nombre");
       expect(result.email).toBe("nuevo@example.com");
-      expect(result.password).toBe("nuevaPassword123");
+      expect(result.password).toBe("nuevaPassword123!");
     });
 
     it("rechaza una password de reseteo menor a 8 caracteres", () => {
       expect(() => updateUserSchema.parse({ password: "corta" })).toThrow();
+    });
+
+    it("aplica la política completa al resetear: mayúscula, número y carácter especial", () => {
+      for (const password of ["sinmayuscula1!", "SinNumero!!", "SinEspecial12"]) {
+        expect(updateUserSchema.safeParse({ password }).success).toBe(false);
+      }
+      expect(updateUserSchema.safeParse({ password: "Valida#2026" }).success).toBe(true);
     });
 
     it("rechaza un email con formato inválido", () => {

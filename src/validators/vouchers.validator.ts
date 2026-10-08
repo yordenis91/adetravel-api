@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { UNIFIED_SERVICE_TYPES, serviceTypeInput } from "./service-types";
 
 export const VOUCHER_STATUSES = ["BORRADOR", "EMITIDO", "CANCELADO"] as const;
 export type VoucherStatus = (typeof VOUCHER_STATUSES)[number];
 
-export const SERVICE_TYPES = ["HOTEL", "AÉREO", "TOUR", "TRANSFER", "SEGURO", "RESTAURANT", "OTRO"] as const;
+// Lista unificada con solicitudes y servicios (ver ./service-types.ts); los valores antiguos se convierten.
+export const SERVICE_TYPES = UNIFIED_SERVICE_TYPES;
 
 export const VALID_TRANSITIONS: Record<string, string[]> = {
   BORRADOR: ["EMITIDO", "CANCELADO"],
@@ -15,7 +17,7 @@ export const VALID_TRANSITIONS: Record<string, string[]> = {
 const voucherObjectSchema = z.object({
   requestId: z.string().min(1, "La solicitud es obligatoria"),
   providerId: z.string().optional().nullable(),
-  serviceType: z.enum(SERVICE_TYPES).optional().nullable(),
+  serviceType: serviceTypeInput.optional().nullable(),
   serviceName: z.string().max(200).optional().nullable(),
   serviceDetails: z.string().max(2000).optional().nullable(),
   checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato inválido (YYYY-MM-DD)").optional().nullable(),
