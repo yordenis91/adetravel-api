@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { partialUpdate } from "./partial-update";
 import { VALID_TRANSITIONS, WORKFLOW_STATUSES, changeStatusSchema } from "./workflow-status";
 
 export const SERVICE_TYPES = [
@@ -42,7 +43,7 @@ export const createRequestSchema = baseRequestSchema.refine(validateBudget, {
 });
 
 // 4. Aplicamos .partial() AL ESQUEMA BASE y luego lo refinamos para la actualización
-export const updateRequestSchema = baseRequestSchema.partial().refine(validateBudget, {
+export const updateRequestSchema = partialUpdate(baseRequestSchema).refine(validateBudget, {
   message: "El presupuesto maximo debe ser mayor o igual al minimo",
   path: ["budgetMax"]
 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { partialUpdate } from "./partial-update";
 
 export const EMAIL_TEMPLATE_TYPES = [
   "QUOTATION_SENT",
@@ -71,7 +72,7 @@ export const createTemplateSchema = z.object({
   isActive: z.boolean().optional().default(true),
 });
 
-export const updateTemplateSchema = createTemplateSchema.partial();
+export const updateTemplateSchema = partialUpdate(createTemplateSchema);
 
 export const toggleTemplateSchema = z.object({
   isActive: z.boolean({ message: "El campo isActive es obligatorio" })
