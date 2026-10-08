@@ -97,7 +97,8 @@ export const vouchersQuerySchema = paginationQuerySchema.extend({
     z.nativeEnum(VoucherStatus)
   ).optional(),
   clientId: z.string().uuid().optional(),
-  requestId: z.string().uuid().optional()
+  requestId: z.string().uuid().optional(),
+  providerId: z.string().uuid().optional()
 });
 export const voucherCreateSchema = z.object({
   requestId: z.string().uuid(),
