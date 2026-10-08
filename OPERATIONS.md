@@ -256,7 +256,7 @@ llega igualmente por Sentry y por el heartbeat.
 
 ## Réplicas y trabajos programados
 
-Los trabajos programados (avisos de atraso a las 9:00, backup diario y alerta de disco) corren **dentro
+Los trabajos programados (avisos de atraso a las 9:00, backup diario, alerta de disco y actualización de tasas de cambio) corren **dentro
 del proceso de la API**. Con una réplica no hay problema. Con más de una, cada réplica los ejecutaría:
 avisos y backups duplicados. Por eso existe `JOBS_ENABLED`:
 
@@ -264,6 +264,14 @@ avisos y backups duplicados. Por eso existe `JOBS_ENABLED`:
 - **Varias réplicas:** dejar `JOBS_ENABLED=true` en una sola y `false` en el resto. En Easypanel esto
   supone un segundo servicio con la misma imagen y `JOBS_ENABLED=false` para las réplicas de tráfico.
   También sirve un servicio aparte solo para los trabajos.
+
+### Tasas de cambio automáticas
+
+Un trabajo despierta cada 5 minutos y sincroniza con la API de divisas cuando corresponde según
+Configuración > Divisas: por defecto 3 veces al día (480 min); el intervalo es editable (15 min a 7 días)
+y se puede apagar. Requiere `CURRENCY_API_KEY`; sin ella no hace nada. Con un plan de pago de la API,
+basta acortar el intervalo desde la pantalla, sin tocar variables ni redesplegar. El último intento y el
+último error se ven en esa misma pestaña. Cada sincronización queda en el registro de actividad.
 
 ## Lista de comprobación de salida
 

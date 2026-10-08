@@ -4,7 +4,10 @@ import { logger } from "../utils/logger";
 import { runOverdueNotificationsJob } from "./overdueNotifications.job";
 import { runDatabaseBackupJob, backupsEnabled } from "./backupDatabase.job";
 import { runDiskSpaceJob } from "./diskSpace.job";
+import { syncExchangeRates } from "../services/exchange-rate.service";
 import { pingBackupHeartbeat, raiseOpsAlert } from "../services/ops-alert.service";
+
+const EXCHANGE_RATES_TICK_CRON = "*/5 * * * *";
 
 /**
  * Registra los cron jobs del sistema. Se llama una vez al arrancar el servidor (ver server.ts).
@@ -55,6 +58,18 @@ export function registerJobs(): void {
       .catch((error) => logger.error({ error }, "[jobs] diskSpace falló"));
   cron.schedule(env.DISK_CHECK_CRON, checkDisk);
   void checkDisk();
+
+  // Tasas de cambio: el cron solo "despierta" cada 5 minutos; si toca sincronizar lo decide la
+  // configuración guardada (exchangeAutoSync / exchangeSyncIntervalMinutes), así que cambiar la
+  // frecuencia desde Configuración > Divisas rige sin reiniciar. Tras un redeploy retoma lo pendiente.
+  const syncRates = () =>
+    syncExchangeRates("auto")
+      .then((result) => {
+        if (result.status !== "skipped" || result.reason === "no-api-key") logger.info({ result }, "[jobs] exchangeRates ejecutado");
+      })
+      .catch((error) => logger.error({ err: error?.message }, "[jobs] exchangeRates falló"));
+  cron.schedule(EXCHANGE_RATES_TICK_CRON, syncRates);
+  void syncRates();
 
   logger.info("[jobs] Cron jobs registrados");
 }

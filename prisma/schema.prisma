@@ -484,6 +484,19 @@ model SystemConfig {
   confirmationNumberPrefix     String?  @default("CONF")
   timezone                     String?  @default("America/Santiago")
   exchangeRates                String?  @db.Text
+  // Actualización automática de tasas (ver services/exchange-rate.service.ts). 480 min = 3 veces al día.
+  exchangeAutoSync             Boolean  @default(true)
+  exchangeSyncIntervalMinutes  Int      @default(480)
+  // Los escribe solo el servidor: último intento, última sincronización exitosa y último error.
+  exchangeLastAttemptAt        DateTime?
+  exchangeLastSyncAt           DateTime?
+  exchangeLastSyncError        String?
+  // Documentos legales públicos (/legal/*). HTML ya sanitizado; null = se muestra el texto por defecto.
+  // Los *UpdatedAt los escribe solo el servidor cuando cambia el contenido.
+  termsOfServiceHtml           String?  @db.Text
+  termsOfServiceUpdatedAt      DateTime?
+  privacyPolicyHtml            String?  @db.Text
+  privacyPolicyUpdatedAt       DateTime?
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 

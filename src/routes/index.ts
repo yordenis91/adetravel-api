@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { globalSearch } from "../controllers/search.controller";
 import { authRouter } from "./auth.routes";
+import { publicLegalRouter } from "./public-legal.routes";
 import { usersRouter } from "./users.routes";
 import { clientsRouter } from "./clients.routes";
 import { providersRouter } from "./providers.routes";
@@ -28,6 +29,7 @@ import { clientVisibility } from "../middlewares/client-visibility.middleware";
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/public/legal", publicLegalRouter);
 apiRouter.use(authMiddleware);
 apiRouter.use(clientVisibility);
 apiRouter.use("/tasks", tasksRouter);

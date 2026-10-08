@@ -123,6 +123,10 @@ const numberPrefixSchema = z.string().trim().regex(/^[A-Za-z0-9]{1,10}$/, "El pr
 
 export const systemConfigUpsertSchema = z.object({
   exchangeRates: z.string().optional().nullable(),
+  exchangeAutoSync: z.boolean().optional(),
+  termsOfServiceHtml: z.string().max(200_000, "El texto es demasiado largo").optional().nullable(),
+  privacyPolicyHtml: z.string().max(200_000, "El texto es demasiado largo").optional().nullable(),
+  exchangeSyncIntervalMinutes: z.number().int().min(15, "El intervalo mínimo es 15 minutos").max(10080, "El intervalo máximo es 7 días").optional(),
   requestNumberPrefix: numberPrefixSchema,
   quotationNumberPrefix: numberPrefixSchema,
   paymentNumberPrefix: numberPrefixSchema,
