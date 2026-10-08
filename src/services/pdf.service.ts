@@ -6,6 +6,7 @@ import { QuotationDocument } from "../pdf/QuotationDocument";
 import { VoucherDocument } from "../pdf/VoucherDocument";
 import { AgencyHeader, getAgencyHeader } from "./agency.service";
 import { escapeHtml } from "../utils/html";
+import { serviceTypeLabel } from "../validators/service-types";
 import { formatMoney } from "../utils/money";
 
 export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
@@ -88,7 +89,7 @@ export async function generateVoucherPdfBuffer(voucher: any): Promise<Buffer> {
   const element = React.createElement(VoucherDocument, {
     voucherNumber: voucher.voucherNumber,
     status: voucher.status,
-    serviceType: voucher.serviceType,
+    serviceType: serviceTypeLabel(voucher.serviceType),
     serviceName: voucher.serviceName,
     serviceDetails: voucher.serviceDetails,
     destination: voucher.destination,

@@ -10,6 +10,7 @@ import { generateVoucherPdfBuffer } from "../services/pdf.service";
 import { VALID_TRANSITIONS } from "../validators/vouchers.validator";
 import { advanceWorkflowStatus } from "../services/workflow.service";
 import { isAtOrAfter } from "../validators/workflow-status";
+import { normalizeServiceType } from "../validators/service-types";
 
 export async function listVouchers(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -21,7 +22,7 @@ export async function listVouchers(req: Request, res: Response): Promise<void> {
     ...(req.query.clientId ? { clientId: req.query.clientId as string } : {}),
     ...(req.query.requestId ? { requestId: req.query.requestId as string } : {}),
     ...(req.query.providerId ? { providerId: req.query.providerId as string } : {}),
-    ...(req.query.serviceType ? { serviceType: req.query.serviceType as string } : {})
+    ...(req.query.serviceType ? { serviceType: normalizeServiceType(req.query.serviceType as string) } : {})
   };
 
   if (req.query.search) {

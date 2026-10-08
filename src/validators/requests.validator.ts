@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { partialUpdate } from "./partial-update";
 import { VALID_TRANSITIONS, WORKFLOW_STATUSES, changeStatusSchema } from "./workflow-status";
+import { UNIFIED_SERVICE_TYPES, serviceTypeInput } from "./service-types";
 
-export const SERVICE_TYPES = [
-  "HOTEL", "AEREO", "TOUR", "TRANSFER", "SEGURO", "RENT_A_CAR", "CRUCERO", "OTRO"
-] as const;
+// Tipos de servicio deseados: la lista unificada (ver ./service-types.ts). Los valores antiguos
+// (HOTEL, AEREO…) se aceptan y se guardan convertidos.
+export const SERVICE_TYPES = UNIFIED_SERVICE_TYPES;
 
 // El flujo de 17 estados y su mapa de transiciones ahora vive en ./workflow-status.ts
 // (compartido con Service). Se re-exportan aquí para no romper los imports existentes.
@@ -25,7 +26,7 @@ const baseRequestSchema = z.object({
   budgetMin: z.coerce.number().min(0).optional(),
   budgetMax: z.coerce.number().min(0).optional(),
   description: z.string().max(2000).optional(),
-  services: z.array(z.enum(SERVICE_TYPES)).default([])
+  services: z.array(serviceTypeInput).transform((types) => [...new Set(types)]).default([])
 });
 
 // 2. Función auxiliar para el refinamiento de presupuestos
