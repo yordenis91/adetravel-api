@@ -180,12 +180,18 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
   const newStatus = req.body.status.toUpperCase();
   const notes = req.body.notes;
 
-  const existing = await prisma.quotation.findUnique({ where: { id }, include: { client: true } });
+  const existing = await prisma.quotation.findUnique({ where: { id }, include: { client: true, request: { select: { status: true } } } });
   if (!existing) throw new ApiError("Cotización no encontrada", 404);
 
   const currentStatus = existing.status;
   const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
   if (!allowed.includes(newStatus)) throw new ApiError(`Transición inválida de ${currentStatus} a ${newStatus}`, 409);
+
+  // Una solicitud cancelada no admite enviar ni aceptar cotizaciones: quedaría una cotización
+  // aceptada que no se puede cobrar (los pagos se rechazan con REQUEST_CANCELLED). Rechazar sí.
+  if (["ENVIADA", "ACEPTADA"].includes(newStatus) && existing.request?.status === "CANCELADA") {
+    throw new ApiError("La solicitud está cancelada: no se puede enviar ni aceptar la cotización", 409, "REQUEST_CANCELLED");
+  }
 
   // Regla Buildy: Si se envía, verificar que el cliente tiene email
   if (newStatus === "ENVIADA" && !existing.client.email) {
