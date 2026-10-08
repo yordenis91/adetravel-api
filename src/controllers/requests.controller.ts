@@ -8,6 +8,7 @@ import { generateNumber } from "../services/numbering.service";
 import { syncServicesOnRequestStatusChange } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/requests.validator";
 import { sendTemplateEmail } from "../services/email.service";
+import { logger } from "../utils/logger";
 
 export async function listRequests(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -114,7 +115,7 @@ export async function createRequest(req: Request, res: Response): Promise<void> 
       to: config.agencyEmail,
       fallbackSubject: `Nueva solicitud: ${item.requestNumber}`,
       fallbackHtml: `<p>Se ha registrado una nueva solicitud con el número <strong>${item.requestNumber}</strong>.</p>`
-    }).catch(e => console.error("Error enviando notificación de nueva solicitud:", e));
+    }).catch(e => logger.error({ err: e }, "Error enviando notificación de nueva solicitud"));
   }
 
   sendItem(res, item, 201);

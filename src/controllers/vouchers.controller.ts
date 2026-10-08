@@ -10,6 +10,7 @@ import { generateVoucherPdfBuffer } from "../services/pdf.service";
 import { VALID_TRANSITIONS } from "../validators/vouchers.validator";
 import { advanceWorkflowStatus } from "../services/workflow.service";
 import { isAtOrAfter } from "../validators/workflow-status";
+import { logger } from "../utils/logger";
 import { normalizeServiceType } from "../validators/service-types";
 
 export async function listVouchers(req: Request, res: Response): Promise<void> {
@@ -194,7 +195,7 @@ export async function changeVoucherStatus(req: Request, res: Response): Promise<
       to: updated.client.email,
       fallbackSubject: `Voucher de Servicio Confirmado: ${updated.voucherNumber}`,
       fallbackHtml: `<p>Estimado/a ${updated.client.firstName}, su servicio <strong>${updated.serviceName}</strong> ha sido confirmado con el código <strong>${updated.confirmationCode || 'Pendiente'}</strong>.</p>`
-    }).catch(e => console.error("Error enviando email de voucher:", e));
+    }).catch(e => logger.error({ err: e }, "Error enviando email de voucher"));
   }
 
   await createActivityLog({ action: "UPDATE", entityType: "Voucher", entityId: id, entityLabel: existing.voucherNumber, description: `Estado cambiado de ${currentStatus} a ${newStatus}`, performedBy: req.user!.id });

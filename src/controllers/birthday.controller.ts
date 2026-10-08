@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 // Ajusta la ruta según dónde tengas tu archivo email.service.ts
 import { sendTemplateEmail } from "../services/email.service"; 
+import { logger } from "../utils/logger";
 
 export async function sendBirthdayEmails(req: Request, res: Response): Promise<void> {
   try {
@@ -53,7 +54,7 @@ export async function sendBirthdayEmails(req: Request, res: Response): Promise<v
 
     res.status(200).json({ message: "Correos enviados exitosamente" });
   } catch (error) {
-    console.error("Error enviando cumpleaños:", error);
+    logger.error({ err: error }, "Error enviando saludo de cumpleaños");
     res.status(500).json({ message: "Error al enviar los correos de cumpleaños" });
   }
 }

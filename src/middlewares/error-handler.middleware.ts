@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/node";
 import { ApiError } from "../utils/api-error";
 import { logger } from "../utils/logger";
 import { sendError } from "../utils/response";
+import { currentRequestId } from "../utils/request-context";
 
 export function errorHandler(
   err: unknown,
@@ -29,6 +30,9 @@ export function errorHandler(
   }
 
   logger.error({ err }, "Unhandled error");
-  Sentry.captureException(err);
+  // El mismo requestId que el log y la cabecera X-Request-Id, para cruzar Sentry con los logs.
+  const requestId = currentRequestId();
+  if (requestId) Sentry.captureException(err, { tags: { request_id: requestId } });
+  else Sentry.captureException(err);
   sendError(res, "Error interno del servidor", "INTERNAL_SERVER_ERROR", 500);
 }

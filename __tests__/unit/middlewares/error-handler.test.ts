@@ -7,6 +7,7 @@ const mockCaptureException = jest.fn();
 jest.mock("@sentry/node", () => ({ captureException: mockCaptureException }));
 
 import { errorHandler } from "../../../src/middlewares/error-handler.middleware";
+import { requestContext } from "../../../src/utils/request-context";
 
 describe("errorHandler", () => {
   beforeEach(() => {
@@ -59,5 +60,13 @@ describe("errorHandler", () => {
       expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" })
     );
     expect(mockCaptureException).toHaveBeenCalledWith(err);
+  });
+
+  it("etiqueta el error de Sentry con el requestId de la petición", () => {
+    const err = new Error("inesperado");
+    requestContext.run({ requestId: "req-abcdef12" }, () => {
+      errorHandler(err, {} as Request, createMockRes() as unknown as Response, jest.fn());
+    });
+    expect(mockCaptureException).toHaveBeenLastCalledWith(err, { tags: { request_id: "req-abcdef12" } });
   });
 });

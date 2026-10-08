@@ -5,6 +5,7 @@ import { createActivityLog } from "../services/activity-log.service";
 import { encryptPII } from "../lib/pii-encryption";
 import axios from "axios";
 import https from "https"; // Librería nativa de Node
+import { logger } from "../utils/logger";
 
 /**
  * La contraseña del SMTP nunca sale de la API: se guarda cifrada (misma clave que la PII de
@@ -139,7 +140,8 @@ export async function syncExchangeRates(req: Request, res: Response): Promise<vo
 
     sendItem(res, toPublicConfig(config));
   } catch (error: any) {
-    console.error("Error crítico de Sincronización:", error?.response?.data || error.message);
+    // Sin error.response.data completo: puede incluir la clave de la API de divisas en la URL.
+    logger.error({ err: error, status: error?.response?.status }, "Error crítico de sincronización de divisas");
     res.status(500).json({ 
       message: "Error de red al intentar sincronizar con el proveedor de divisas." 
     });
