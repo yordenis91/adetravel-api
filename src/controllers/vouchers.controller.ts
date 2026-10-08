@@ -95,7 +95,7 @@ export async function createVoucher(req: Request, res: Response): Promise<void> 
   }
 
   const config = await prisma.systemConfig.findFirst();
-  const voucherNumber = await generateNumber("Voucher", config?.voucherNumberPrefix ?? "VCH");
+  const voucherNumber = await generateNumber("Voucher", config?.voucherNumberPrefix || "VCH");
   
   const destination = data.destination || request.destinationCity || request.destinationCountry || "";
 

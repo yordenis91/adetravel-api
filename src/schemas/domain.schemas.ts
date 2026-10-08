@@ -112,8 +112,16 @@ export const activityLogQuerySchema = paginationQuerySchema.extend({
   entityId: z.string().optional()
 });
 
+const numberPrefixSchema = z.string().trim().regex(/^[A-Za-z0-9]{1,10}$/, "El prefijo debe tener 1-10 letras o números").optional();
+
 export const systemConfigUpsertSchema = z.object({
   exchangeRates: z.string().optional().nullable(),
+  requestNumberPrefix: numberPrefixSchema,
+  quotationNumberPrefix: numberPrefixSchema,
+  paymentNumberPrefix: numberPrefixSchema,
+  voucherNumberPrefix: numberPrefixSchema,
+  serviceNumberPrefix: numberPrefixSchema,
+  confirmationNumberPrefix: numberPrefixSchema,
 }).passthrough();
 
 export const emailTemplatesQuerySchema = paginationQuerySchema.extend({

@@ -96,7 +96,7 @@ export async function getRequestVouchers(req: Request, res: Response): Promise<v
 
 export async function createRequest(req: Request, res: Response): Promise<void> {
   const config = await prisma.systemConfig.findFirst();
-  const prefix = config?.requestNumberPrefix ?? "ADET";
+  const prefix = config?.requestNumberPrefix || "ADET";
   const requestNumber = await generateNumber("Request", prefix);
   
   const payload = { ...(req.body as any) };
@@ -178,7 +178,7 @@ export async function duplicateRequest(req: Request, res: Response): Promise<voi
   if (!original) throw new ApiError("Solicitud no encontrada", 404);
 
   const config = await prisma.systemConfig.findFirst();
-  const prefix = config?.requestNumberPrefix ?? "ADET";
+  const prefix = config?.requestNumberPrefix || "ADET";
   const requestNumber = await generateNumber("Request", prefix);
 
   const { id: _id, requestNumber: _reqNum, status, createdAt, updatedAt, createdBy, ...restData } = original as any;

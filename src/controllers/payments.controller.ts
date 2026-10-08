@@ -104,7 +104,7 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
   }
 
   const config = await prisma.systemConfig.findFirst();
-  const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix ?? "PAG");
+  const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix || "PAG");
   
   const item = await prisma.payment.create({
     data: { 

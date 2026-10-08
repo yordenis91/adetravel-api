@@ -97,7 +97,7 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   }
 
   const config = await prisma.systemConfig.findFirst();
-  const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix ?? "COTIZ");
+  const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix || "COTIZ");
 
   // 2. Establecer validez y notas por defecto si no vienen (Regla Buildy)
   let validUntil = data.validUntil;
@@ -255,7 +255,7 @@ export async function duplicateQuotation(req: Request, res: Response): Promise<v
   if (!original) throw new ApiError("Cotización no encontrada", 404);
 
   const config = await prisma.systemConfig.findFirst();
-  const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix ?? "COTIZ");
+  const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix || "COTIZ");
 
   const newValidUntil = new Date();
   newValidUntil.setDate(newValidUntil.getDate() + (config?.defaultQuotationValidityDays ?? 7));
