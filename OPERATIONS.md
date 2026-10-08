@@ -284,3 +284,66 @@ Antes de abrir producción (fase 5), con `.env.example` como referencia de todas
 - [ ] `CURRENCY_API_KEY` si se usan las tasas de cambio.
 - [ ] Ninguna variable de solo scripts (`ADMIN_PASSWORD`, `PII_ENCRYPTION_KEY_OLD/NEW`) queda cargada en el servicio.
 - [ ] Al menos un 15 % de disco libre (`df -h /`) antes del primer despliegue.
+
+## Runbook: despliegue a producción y vuelta atrás
+
+Fase 5 de preproducción. Quién hace cada cosa: el administrador fusiona y ejecuta los pasos en Easypanel;
+nadie más despliega.
+
+### Cómo se despliega
+
+1. Un PR se fusiona a `main` (decisión del administrador).
+2. El CI (`.github/workflows/ci-backend.yml`) construye y prueba. Solo en un `push` a `main` con todo en
+   verde llama al hook `EASYPANEL_BACKEND_DEPLOY_HOOK` (secreto de GitHub). El cliente hace lo mismo con
+   `EASYPANEL_FRONTEND_DEPLOY_HOOK`.
+3. Easypanel construye el `Dockerfile` y arranca con `npm run start`, que ejecuta `prisma migrate deploy` y
+   luego la API. **Las migraciones se aplican solas al arrancar.**
+
+### Antes de cada despliegue
+
+- [ ] `df -h /` con al menos un 15 % libre (con el disco lleno falla `prisma migrate deploy`).
+- [ ] Un backup reciente (el diario de las 3:00 o uno manual) y comprobado en el servicio del heartbeat.
+- [ ] Si el PR trae una migración, leer su `migration.sql`: ¿borra o cambia columnas? Si sí, ver
+      "Vuelta atrás" antes de fusionar.
+
+### Primer despliegue (producción nueva)
+
+La base de producción se crea **vacía**; no se clona la demo (ver el plan de migración en
+`docs/produccion/migracion-demo.md` de `ia-team-adetravel`).
+
+1. Postgres nuevo y servicio de la API con todas las variables de la "Lista de comprobación de salida".
+   Los secretos los escribe el administrador en Easypanel; nunca van al repositorio ni a un chat.
+2. Cliente en el mismo dominio con la ruta `/api` apuntando a la API (como en la demo), o bien
+   `VITE_API_URL` como argumento de build. `FRONTEND_URL` de la API debe ser la URL pública del cliente.
+3. Desplegar la API: al arrancar crea todas las tablas. Comprobar `GET /api/health` = 200.
+4. Crear el primer administrador desde la terminal del servicio de la API en Easypanel (la imagen de
+   producción no trae `ts-node`, por eso no sirve `seed:admin`):
+
+       ADMIN_EMAIL=<correo> ADMIN_PASSWORD='<contraseña nueva>' npm run admin:create
+
+   Rechaza las contraseñas por defecto y las que no cumplen la política. No imprime la contraseña. Es
+   idempotente. Después de entrar, cambiar la contraseña desde la propia aplicación.
+5. Entrar como administrador, completar Configuración (datos reales de la agencia, SMTP y un correo de
+   prueba) y crear al resto de usuarios por invitación.
+6. Provocar un backup manual y confirmar que llega el ping al servicio del heartbeat.
+
+### Después de cada despliegue (humo, 5 minutos)
+
+- [ ] `GET /api/health` = 200 y el cliente carga.
+- [ ] Iniciar sesión, abrir una solicitud y una lista.
+- [ ] Los logs del servicio no muestran errores al arrancar ni `Migration ... failed`.
+- [ ] Sentry sin errores nuevos en los primeros minutos.
+
+### Vuelta atrás
+
+| Qué falló | Qué hacer |
+|---|---|
+| Código sin migración nueva | Revertir el PR en GitHub (botón "Revert"), fusionar el PR de reversión: el CI redespliega solo. Es el camino verificado. |
+| Código con migración | Las migraciones solo avanzan. Si la migración era aditiva (columna o tabla nueva), basta revertir el código: el esquema nuevo es compatible con el código viejo. Si borraba o cambiaba datos, restaurar el backup (siguiente fila). |
+| Datos dañados | Ventana de mantenimiento, apagar la API, restaurar el backup previo en una base de prueba, verificarlo y recién entonces sobre la real (sección "Cómo restaurar un backup"). Se pierde lo escrito desde el backup. |
+| Migración a medias (`P3009`) | Sección "Cómo recuperarse de una migración fallida (P3009)". |
+
+Regla para los PR con migración: que sea **compatible hacia atrás** (primero añadir, desplegar, y solo
+en un despliegue posterior quitar lo que ya no se usa). Así volver al código anterior siempre es posible.
+No verificado: si Easypanel conserva y permite redesplegar la imagen anterior sin pasar por GitHub;
+mientras no se pruebe, la reversión es por PR.
