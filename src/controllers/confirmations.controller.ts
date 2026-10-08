@@ -79,7 +79,7 @@ export async function createConfirmation(req: Request, res: Response): Promise<v
   }
 
   const config = await prisma.systemConfig.findFirst();
-  const confirmationNumber = await generateNumber("Confirmation", config?.confirmationNumberPrefix ?? "CONF");
+  const confirmationNumber = await generateNumber("Confirmation", config?.confirmationNumberPrefix || "CONF");
 
   const item = await prisma.confirmation.create({
     data: { ...data, confirmationNumber, createdBy: req.user!.id }

@@ -80,7 +80,7 @@ export async function createService(req: Request, res: Response): Promise<void> 
   }
 
   const config = await prisma.systemConfig.findFirst();
-  const serviceNumber = await generateNumber("Service", config?.serviceNumberPrefix ?? "SRV");
+  const serviceNumber = await generateNumber("Service", config?.serviceNumberPrefix || "SRV");
 
   const item = await prisma.service.create({
     data: { ...data, serviceNumber, createdBy: req.user!.id }
