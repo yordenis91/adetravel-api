@@ -179,13 +179,30 @@ export async function updatePayment(req: Request, res: Response): Promise<void> 
 export async function changePaymentStatus(req: Request, res: Response): Promise<void> {
   const id = String(req.params.id);
   const newStatus = req.body.status.toUpperCase();
-  const existing = await prisma.payment.findUnique({ where: { id }, include: { client: true } });
+  const existing = await prisma.payment.findUnique({ where: { id }, include: { client: true, request: { select: { status: true } } } });
   if (!existing) throw new ApiError("Pago no encontrado", 404);
 
   const currentStatus = existing.status;
   const allowed = VALID_TRANSITIONS[currentStatus] ?? [];
   if (!allowed.includes(newStatus)) {
     throw new ApiError(`Transición inválida. No se puede pasar de ${currentStatus} a ${newStatus}`, 409);
+  }
+
+  // Reabrir un pago cancelado vuelve a ponerlo "vivo": se repiten las comprobaciones del alta. Sin
+  // esto, cancelar A, registrar B y reabrir A dejaba dos pagos vivos para la misma cotización y
+  // completar ambos cobraba dos veces.
+  if (currentStatus === "CANCELADO" && newStatus === "PENDIENTE") {
+    if (existing.request?.status === "CANCELADA") {
+      throw new ApiError("No se pueden reabrir pagos de una solicitud cancelada", 409, "REQUEST_CANCELLED");
+    }
+    if (!env.ALLOW_PARTIAL_PAYMENTS && existing.quotationId) {
+      const others = await prisma.payment.count({
+        where: { quotationId: existing.quotationId, status: { in: ["PENDIENTE", "COMPLETADO"] }, id: { not: id } },
+      });
+      if (others > 0) {
+        throw new ApiError("Esa cotización ya tiene otro pago registrado: no se puede reabrir este", 409, "PAYMENT_ALREADY_EXISTS");
+      }
+    }
   }
 
   // Determinar si el pago pasará a estado COMPLETADO (comparando previo y nuevo)
