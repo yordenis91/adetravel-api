@@ -56,7 +56,22 @@ const envSchema = z.object({
   BACKUP_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   BACKUP_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   BACKUP_CRON: z.string().default("0 3 * * *"),
-  BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30)
+  BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  // Operación (ver OPERATIONS.md, "Alertas"). Todas opcionales.
+  // Correo que recibe las alertas (backup fallido, disco casi lleno). Respeta EMAIL_DELIVERY.
+  ALERT_EMAIL: z.string().email().optional(),
+  // Dead man's switch del backup (p. ej. healthchecks.io): GET al terminar bien, GET a <url>/fail si
+  // falla. Si el backup deja de ejecutarse, el servicio externo avisa por su cuenta.
+  BACKUP_HEARTBEAT_URL: z.string().url().optional(),
+  // Alerta de disco: el contenedor ve el disco del servidor (overlay), el mismo que se llenó el 2026-10-07.
+  DISK_CHECK_PATH: z.string().default("/"),
+  DISK_CHECK_CRON: z.string().default("*/30 * * * *"),
+  DISK_ALERT_MIN_FREE_PERCENT: z.coerce.number().min(1).max(90).default(15),
+  // Con más de una réplica, solo una debe ejecutar los trabajos programados (las demás con false).
+  JOBS_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true")
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -68,6 +83,9 @@ if (parsed.data.EMAIL_DELIVERY === "redirect" && !parsed.data.EMAIL_REDIRECT_TO)
 }
 
 export const env = parsed.data;
+
+/** Nombres de todas las variables que lee la API (una prueba exige que estén en .env.example). */
+export const ENV_KEYS = Object.keys(envSchema.shape);
 
 /**
  * Motivo por el que JWT_SECRET parece débil, o null. No impide arrancar (un secreto corto en

@@ -228,3 +228,59 @@ pasaporte legible. Falta repetirlo contra el bucket real de la demo.
   servicio separado. Si el contenedor está caído en el momento exacto del
   cron, esa corrida se salta (vuelve a correr al día siguiente). Aceptable
   para un backup diario, pero vale tenerlo presente.
+
+## Alertas
+
+Fase 4 de preproducción. Qué avisa, por qué canal y qué hacer.
+
+| Alerta | Cuándo salta | Canal | Qué hacer |
+|---|---|---|---|
+| `BACKUP_FAILED` | Cada vez que el backup programado falla | Log `error`, Sentry (`alert:BACKUP_FAILED`), correo a `ALERT_EMAIL` y `<BACKUP_HEARTBEAT_URL>/fail` | Ver el mensaje (credenciales S3, bucket, `pg_dump`) y lanzar un backup manual cuando esté resuelto |
+| Backup que no corre | El servicio externo del heartbeat no recibe el ping del día | Lo avisa ese servicio (healthchecks.io u otro) | El contenedor estuvo caído a la hora del cron, `JOBS_ENABLED=false` en la única réplica o faltan las variables `BACKUP_S3_*` |
+| `DISK_LOW` | Espacio libre del disco del servidor por debajo de `DISK_ALERT_MIN_FREE_PERCENT` (15 %); se comprueba cada 30 min y se repite como mucho cada 6 h | Log `error`, Sentry (`alert:DISK_LOW`) y correo a `ALERT_EMAIL` | `df -h /` en el servidor; liberar caché de build (`docker builder prune`) e imágenes sin uso **antes** del siguiente despliegue: con el disco lleno falla `prisma migrate deploy` (incidente del 2026-10-07) |
+| Aplicación caída | `/api/health` deja de responder 200 (la API no arranca o la base no responde) | Monitor externo (ver abajo) | Logs del servicio en Easypanel; si es una migración fallida, la sección P3009 de este documento |
+
+**Cómo se ve el disco desde la API:** el contenedor usa `overlay` sobre el mismo disco del servidor, así
+que `statfs("/")` dentro del contenedor da las cifras del servidor (comprobado: `df -h /` dentro y fuera
+de un contenedor dan el mismo tamaño y uso).
+
+**Aplicación caída: necesita un monitor externo.** Una aplicación caída no puede avisar de sí misma, y el
+`HEALTHCHECK` del Dockerfile solo reinicia el contenedor. Hace falta un servicio que consulte
+`https://<api>/api/health` cada 1-5 minutos desde fuera del servidor y avise por correo, por ejemplo
+UptimeRobot, Better Stack o healthchecks.io. `/api/health` devuelve 200 solo si la base responde a `SELECT 1` y no consume el límite de peticiones. Conviene vigilar también la URL
+del cliente. Crear la cuenta del monitor es tarea del administrador.
+
+**Correo de las alertas:** pasa por `sendEmail`, así que respeta `EMAIL_DELIVERY` (con `redirect` llega a
+`EMAIL_REDIRECT_TO`; con `off` solo queda en el log y en Sentry). Si el SMTP es lo que falla, el aviso
+llega igualmente por Sentry y por el heartbeat.
+
+## Réplicas y trabajos programados
+
+Los trabajos programados (avisos de atraso a las 9:00, backup diario y alerta de disco) corren **dentro
+del proceso de la API**. Con una réplica no hay problema. Con más de una, cada réplica los ejecutaría:
+avisos y backups duplicados. Por eso existe `JOBS_ENABLED`:
+
+- **Una réplica (configuración actual):** `JOBS_ENABLED=true` (valor por defecto).
+- **Varias réplicas:** dejar `JOBS_ENABLED=true` en una sola y `false` en el resto. En Easypanel esto
+  supone un segundo servicio con la misma imagen y `JOBS_ENABLED=false` para las réplicas de tráfico.
+  También sirve un servicio aparte solo para los trabajos.
+
+## Lista de comprobación de salida
+
+Antes de abrir producción (fase 5), con `.env.example` como referencia de todas las variables:
+
+- [ ] `NODE_ENV=production`, `DATABASE_URL` de la base de producción y `FRONTEND_URL` con la URL pública del cliente.
+- [ ] `JWT_SECRET` nuevo, aleatorio y de 32 caracteres o más, distinto del de la demo. El arranque avisa si es débil.
+- [ ] `PII_ENCRYPTION_KEY` nueva, de 64 caracteres hex, guardada **también fuera del servidor**. Sin ella los backups no sirven para los datos cifrados.
+- [ ] `EMAIL_DELIVERY=live` solo en producción; en la demo, `redirect` con `EMAIL_REDIRECT_TO`.
+- [ ] SMTP configurado (variables o Configuración > Correo) y un correo de prueba recibido.
+- [ ] `ALLOW_PUBLIC_REGISTRATION=false`; los usuarios entran por invitación.
+- [ ] `ALLOW_PARTIAL_PAYMENTS` y `BLOCK_EXPIRED_QUOTATIONS` confirmados con la agencia.
+- [ ] Las 4 variables `BACKUP_S3_*` con un bucket propio; un backup ejecutado y un `npm run restore:drill` correcto contra ese bucket.
+- [ ] `ALERT_EMAIL` y `BACKUP_HEARTBEAT_URL` configurados, y un fallo provocado del heartbeat recibido.
+- [ ] Monitor externo de `/api/health` (y de la URL del cliente) creado, con aviso por correo.
+- [ ] `SENTRY_DSN` (API) y `VITE_SENTRY_DSN` (cliente) con `SENTRY_ENVIRONMENT=production`.
+- [ ] `JOBS_ENABLED=true` en una sola réplica.
+- [ ] `CURRENCY_API_KEY` si se usan las tasas de cambio.
+- [ ] Ninguna variable de solo scripts (`ADMIN_PASSWORD`, `PII_ENCRYPTION_KEY_OLD/NEW`) queda cargada en el servicio.
+- [ ] Al menos un 15 % de disco libre (`df -h /`) antes del primer despliegue.
