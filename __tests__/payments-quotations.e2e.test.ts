@@ -40,6 +40,7 @@ describe("pagos y cotizaciones de extremo a extremo (integración con Postgres)"
   afterAll(async () => {
     const where = { requestId: { in: requestIds } };
     await prisma.payment.deleteMany({ where });
+    await prisma.service.deleteMany({ where });
     await prisma.quotation.deleteMany({ where });
     await prisma.notification.deleteMany({ where: { userId: admin.id } });
     await prisma.activityLog.deleteMany({ where: { performedBy: admin.id } });
@@ -163,6 +164,39 @@ describe("pagos y cotizaciones de extremo a extremo (integración con Postgres)"
 
     const pago = await post("/api/payments", { requestId: req.id, amount: 30000, method: "EFECTIVO" });
     expect([pago.status, codeOf(pago)]).toEqual([409, "REQUEST_CANCELLED"]);
+  });
+
+  describe("decisiones del administrador (2026-10-08)", () => {
+    it("se puede cobrar antes de la confirmación del proveedor: aceptada pasa a pagada", async () => {
+      const { req, quotation } = await acceptedQuotation();
+      expect(await statusOf(req.id)).toBe("ACEPTADA_POR_CLIENTE");
+      const pago = await post("/api/payments", { requestId: req.id, amount: quotation.total, method: "EFECTIVO" });
+      expect((await patch(`/api/payments/${pago.body.data.id}/status`, { status: "COMPLETADO" })).status).toBe(200);
+      expect(await statusOf(req.id)).toBe("PAGADO_POR_CLIENTE");
+    });
+
+    it("revertir el pago cobrado devuelve la solicitud y sus servicios a 'solicitud de pago enviada'", async () => {
+      const { req, quotation } = await acceptedQuotation();
+      const svc = await prisma.service.create({ data: { serviceNumber: `${tag}-S${seq}`, requestId: req.id, type: "SEGURO", details: {} } });
+      const pago = await post("/api/payments", { requestId: req.id, amount: quotation.total, method: "EFECTIVO" });
+      await patch(`/api/payments/${pago.body.data.id}/status`, { status: "COMPLETADO" });
+      expect(await statusOf(req.id)).toBe("PAGADO_POR_CLIENTE");
+      expect((await prisma.service.findUnique({ where: { id: svc.id } })).status).toBe("PAGADO_POR_CLIENTE");
+
+      expect((await patch(`/api/payments/${pago.body.data.id}/status`, { status: "CANCELADO" })).status).toBe(200);
+      expect(await statusOf(req.id)).toBe("ENVIADA_SOLICITUD_PAGO_CLIENTE");
+      expect((await prisma.service.findUnique({ where: { id: svc.id } })).status).toBe("ENVIADA_SOLICITUD_PAGO_CLIENTE");
+      await prisma.service.delete({ where: { id: svc.id } });
+    });
+
+    it("si la solicitud ya avanzó más allá del pago, la reversa no la toca", async () => {
+      const { req, quotation } = await acceptedQuotation();
+      const pago = await post("/api/payments", { requestId: req.id, amount: quotation.total, method: "EFECTIVO" });
+      await patch(`/api/payments/${pago.body.data.id}/status`, { status: "COMPLETADO" });
+      await prisma.request.update({ where: { id: req.id }, data: { status: "PAGADO_AL_PROVEEDOR" } });
+      expect((await patch(`/api/payments/${pago.body.data.id}/status`, { status: "CANCELADO" })).status).toBe(200);
+      expect(await statusOf(req.id)).toBe("PAGADO_AL_PROVEEDOR");
+    });
   });
 
   it("10 altas simultáneas del mismo pago crean exactamente uno", async () => {

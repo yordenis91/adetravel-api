@@ -6,7 +6,7 @@ import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
-import { advanceWorkflowStatus } from "../services/workflow.service";
+import { advanceWorkflowStatus, revertPaidRequest } from "../services/workflow.service";
 import { isRequestFullyPaid } from "../services/payment-coverage";
 import { resolveFullPaymentQuotation } from "../services/payment-rules";
 import { env } from "../config/env";
@@ -269,7 +269,13 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
     await advanceWorkflowStatus(existing.requestId, null, "PAGADO_POR_CLIENTE");
   }
 
-  await createActivityLog({ action: "UPDATE", entityType: "Payment", entityId: id, entityLabel: existing.paymentNumber, description: `Estado cambiado de ${currentStatus} a ${newStatus}`, performedBy: req.user!.id });
+  // Reversa de un pago completado: si la solicitud ya no queda cubierta, deja de estar pagada.
+  let reverted = false;
+  if (currentStatus === "COMPLETADO" && newStatus === "CANCELADO" && existing.requestId && !(await isRequestFullyPaid(existing.requestId))) {
+    reverted = await revertPaidRequest(existing.requestId);
+  }
+
+  await createActivityLog({ action: "UPDATE", entityType: "Payment", entityId: id, entityLabel: existing.paymentNumber, description: `Estado cambiado de ${currentStatus} a ${newStatus}${reverted ? ". La solicitud vuelve a ENVIADA_SOLICITUD_PAGO_CLIENTE" : ""}`, performedBy: req.user!.id });
   sendItem(res, updated);
 }
 

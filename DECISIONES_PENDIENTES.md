@@ -39,6 +39,14 @@ Con `BLOCK_EXPIRED_QUOTATIONS=true` (hoy), pasar a `ENVIADA` o `ACEPTADA` una co
 validez ya pasó responde 409 `QUOTATION_EXPIRED`. La fecha se compara con la de Chile
 (`America/Santiago`). Rechazar siempre está permitido. Con `false` no se valida la vigencia.
 
+## Decisiones confirmadas por el administrador (2026-10-08)
+
+| Decisión | Comportamiento | Dónde |
+|---|---|---|
+| ¿Se puede cobrar antes de que el proveedor confirme? | **Sí.** Completar el pago lleva la solicitud a `PAGADO_POR_CLIENTE` aunque esté en `ACEPTADA_POR_CLIENTE`. | `changePaymentStatus` |
+| ¿Qué pasa al revertir un pago completado? | Si la solicitud estaba en `PAGADO_POR_CLIENTE` y deja de estar cubierta, vuelve a `ENVIADA_SOLICITUD_PAGO_CLIENTE` (y sus servicios en `PAGADO_POR_CLIENTE` también). Si ya avanzó más (pago al proveedor, voucher…), no se toca. | `changePaymentStatus`, `revertPaidRequest` |
+| ¿Se puede emitir un voucher antes de pagar al proveedor? | **No.** Emitirlo exige la solicitud en `PAGADO_AL_PROVEEDOR` o más adelante (409 `VOUCHER_TOO_EARLY`) y la lleva a `VOUCHER_EMITIDO`. | `changeVoucherStatus` |
+
 ## Otras decisiones abiertas (sin supuesto implementado)
 
 - **IVA por defecto:** el esquema de cotización usa 0 si no se envía el campo y la configuración de la
