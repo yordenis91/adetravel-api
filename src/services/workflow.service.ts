@@ -79,3 +79,22 @@ export async function advanceWorkflowStatus(
     await syncServicesOnRequestStatusChange(requestId, targetStatus, request.isPackage);
   }
 }
+
+/**
+ * Reversa de un pago (decisión del administrador, 2026-10-08): si la solicitud estaba en
+ * PAGADO_POR_CLIENTE y deja de estar cubierta, vuelve a ENVIADA_SOLICITUD_PAGO_CLIENTE junto con los
+ * servicios que habían bajado a PAGADO_POR_CLIENTE. Si la solicitud ya siguió avanzando (pago al
+ * proveedor, voucher...), no se toca: eso se corrige a mano. Devuelve true si retrocedió.
+ */
+export async function revertPaidRequest(requestId: string): Promise<boolean> {
+  const updated = await prisma.request.updateMany({
+    where: { id: requestId, status: "PAGADO_POR_CLIENTE" },
+    data: { status: "ENVIADA_SOLICITUD_PAGO_CLIENTE" },
+  });
+  if (updated.count === 0) return false;
+  await prisma.service.updateMany({
+    where: { requestId, status: "PAGADO_POR_CLIENTE" },
+    data: { status: "ENVIADA_SOLICITUD_PAGO_CLIENTE" },
+  });
+  return true;
+}
