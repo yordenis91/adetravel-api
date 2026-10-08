@@ -187,6 +187,36 @@ describe("flujo de trabajo de Solicitud y Servicio (integración con Postgres)",
       expect((await patch("ventas", `/api/requests/${req.id}/status`, { status: "RECEPCIONADA" })).status).toBe(200);
     });
 
+    it("reactivar la solicitud reactiva sus servicios, que se pueden modificar, eliminar o volver a cancelar", async () => {
+      const { req, services } = await newRequest({ services: 3 });
+      const [editable, borrable, conCotizacion] = services;
+      await prisma.quotation.create({ data: { quotationNumber: `${tag}-Q${seq}`, requestId: req.id, serviceId: conCotizacion.id, clientId: client.id } });
+
+      await patch("ventas", `/api/requests/${req.id}/status`, { status: "CANCELADA", cancellationReason: "Se pospone el viaje" });
+      for (const s of services) expect(await statusOf("service", s.id)).toBe("CANCELADA");
+
+      const res = await patch("ventas", `/api/requests/${req.id}/status`, { status: "RECEPCIONADA" });
+      expect(res.status).toBe(200);
+      expect(res.body.data.reactivatedServices).toBe(3);
+      expect(res.body.data.cancellationReason).toBeNull();
+      for (const s of services) {
+        const saved = await prisma.service.findUnique({ where: { id: s.id } });
+        expect({ status: saved.status, reason: saved.cancellationReason }).toEqual({ status: "RECEPCIONADA", reason: null });
+      }
+
+      expect((await patch("ventas", `/api/services/${editable.id}`, { price: 480 })).status).toBe(200);
+      expect(Number((await prisma.service.findUnique({ where: { id: editable.id } })).price)).toBe(480);
+      expect((await patch("ventas", `/api/services/${editable.id}/status`, { status: "CANCELADA", cancellationReason: "Ya no lo quiere" })).status).toBe(200);
+      expect(await statusOf("request", req.id)).toBe("RECEPCIONADA");
+
+      const del = (id: string) => request(app).delete(`/api/services/${id}`).set("Authorization", `Bearer ${token("admin")}`);
+      expect((await del(borrable.id)).status).toBe(200);
+      const bloqueado = await del(conCotizacion.id);
+      expect(bloqueado.status).toBe(409);
+      expect(bloqueado.body.error?.code ?? bloqueado.body.code).toBe("SERVICE_HAS_RELATIONS");
+      await prisma.quotation.deleteMany({ where: { requestId: req.id } });
+    });
+
     it("tras pagar solo el administrador puede cancelar (ni ventas)", async () => {
       const { req } = await newRequest();
       await prisma.request.update({ where: { id: req.id }, data: { status: "PAGADO_POR_CLIENTE" } });
