@@ -37,12 +37,10 @@ export const forgotPasswordLimiter = rateLimit({
   max: 5, // 5 solicitudes
   message: "Has intentado demasiadas veces. Por favor, intenta de nuevo en una hora.",
   standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // No aplicar rate limit si es un email corporativo conocido (opcional)
-    const adminEmail = process.env.ADMIN_EMAIL;
-    return req.body?.email === adminEmail;
-  }
+  legacyHeaders: false
+  // Sin excepciones: antes se saltaba el límite si el correo coincidía con ADMIN_EMAIL, y sin esa
+  // variable (como en producción) también cuando el cuerpo no traía correo (undefined === undefined).
+  // Así cualquiera podía inundar de correos de recuperación al administrador.
 });
 
 // Rate limit para reset-password: máximo 3 intentos por hora por IP
