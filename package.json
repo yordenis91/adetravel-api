@@ -9,6 +9,7 @@
     "start": "npx prisma migrate deploy && node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "admin:create": "node dist/scripts/create-admin.js",
     "seed:admin": "ts-node prisma/seed-admin.ts",
     "seed:users": "ts-node prisma/seed-users.ts",
     "seed:clients": "ts-node prisma/seed-clients.ts",
