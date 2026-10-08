@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { partialUpdate } from "./partial-update";
 
 export const SERVICE_TYPES = [
   "SEGURO",
@@ -192,7 +193,7 @@ export const createServiceSchema = baseServiceSchema.refine(typeMatchesDetails, 
   path: ["details"],
 });
 
-export const updateServiceSchema = baseServiceSchema.partial().refine(typeMatchesDetails, {
+export const updateServiceSchema = partialUpdate(baseServiceSchema).refine(typeMatchesDetails, {
   message: "El tipo del servicio no coincide con los datos ingresados en 'details'",
   path: ["details"],
 });

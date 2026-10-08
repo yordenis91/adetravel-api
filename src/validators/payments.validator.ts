@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { partialUpdate } from "./partial-update";
 
 export const PAYMENT_STATUSES = ["PENDIENTE", "COMPLETADO", "CANCELADO"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
@@ -23,7 +24,7 @@ const basePaymentSchema = z.object({
 });
 
 export const createPaymentSchema = basePaymentSchema;
-export const updatePaymentSchema = basePaymentSchema.partial();
+export const updatePaymentSchema = partialUpdate(basePaymentSchema);
 export const changePaymentStatusSchema = z.object({
   status: z.enum(PAYMENT_STATUSES),
   notes: z.string().max(500).optional()

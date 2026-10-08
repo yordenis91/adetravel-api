@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { partialUpdate } from "./partial-update";
 
 export const createClientSchema = z.object({
   firstName: z.string().min(1, "El nombre es obligatorio").max(100),
@@ -23,7 +24,7 @@ export const createClientSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export const updateClientSchema = createClientSchema.partial();
+export const updateClientSchema = partialUpdate(createClientSchema);
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;
