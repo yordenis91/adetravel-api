@@ -20,6 +20,7 @@ export async function listVouchers(req: Request, res: Response): Promise<void> {
     ...(status ? { status } : {}),
     ...(req.query.clientId ? { clientId: req.query.clientId as string } : {}),
     ...(req.query.requestId ? { requestId: req.query.requestId as string } : {}),
+    ...(req.query.providerId ? { providerId: req.query.providerId as string } : {}),
     ...(req.query.serviceType ? { serviceType: req.query.serviceType as string } : {})
   };
 
