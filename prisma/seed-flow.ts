@@ -404,7 +404,7 @@ async function main() {
   await createConfirmation({ request: req10, provider: hotelEnjoy, price: 2280000, providerConfirmationNumber: "PKG-2026-001" });
   const pay10 = await createPayment({ request: req10, quotation: quot10, client: clients[9], amount: 2280000, status: "COMPLETADO" });
   void pay10;
-  await createVoucher({ request: req10, client: clients[9], provider: hotelEnjoy, status: "EMITIDO", serviceType: "PAQUETE", serviceName: "Cancún todo incluido", destination: "Cancún, México", checkIn: toDateInput(daysFromNow(40)), checkOut: toDateInput(daysFromNow(47)), amount: 2280000 });
+  await createVoucher({ request: req10, client: clients[9], provider: hotelEnjoy, status: "EMITIDO", serviceType: "OTRO", serviceName: "Cancún todo incluido", destination: "Cancún, México", checkIn: toDateInput(daysFromNow(40)), checkOut: toDateInput(daysFromNow(47)), amount: 2280000 });
 
   // 11. CANCELADA — el cliente desistió del viaje (regla de negocio #12: motivo obligatorio).
   const req11 = await createRequest({
