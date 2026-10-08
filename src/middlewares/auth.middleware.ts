@@ -3,6 +3,7 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { isTokenRevoked } from "../lib/auth-tokens";
+import { logger } from "../utils/logger";
 
 // Solo para tokens emitidos antes de que existiera el jti (no se pueden revocar en la base).
 // Se pierde al reiniciar, pero esos tokens caducan solos en como mucho JWT_EXPIRES_IN.
@@ -104,7 +105,7 @@ export async function authMiddleware(
     req.user = sessionUser;
     next();
   } catch (error) {
-    console.error("Error en authMiddleware:", error);
+    logger.error({ err: error }, "Error en authMiddleware");
     res.status(500).json({
       error: "Error interno del servidor",
       code: "INTERNAL_ERROR"

@@ -11,6 +11,7 @@ import { isRequestFullyPaid } from "../services/payment-coverage";
 import { resolveFullPaymentQuotation } from "../services/payment-rules";
 import { env } from "../config/env";
 import { VALID_TRANSITIONS } from "../validators/payments.validator";
+import { logger } from "../utils/logger";
 
 export async function listPayments(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -232,7 +233,7 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
       to: updated.client.email,
       fallbackSubject: `Pago ${updated.paymentNumber} confirmado`,
       fallbackHtml: `<p>Estimado/a ${updated.client.firstName}, su pago por ${updated.currency} ${updated.amount} ha sido procesado exitosamente.</p>`
-    }).catch(e => console.error("Error enviando email de pago:", e));
+    }).catch(e => logger.error({ err: e }, "Error enviando email de pago"));
   }
 
   // Crear notificación automática si el pago acaba de completarse
@@ -252,10 +253,10 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
           }
         });
       } else {
-        console.warn("Notificación de pago completado: no se encontró userId para notificar");
+        logger.warn("Notificación de pago completado: no se encontró userId para notificar");
       }
     } catch (e) {
-      console.error("Error creando notificación de pago completado:", e);
+      logger.error({ err: e }, "Error creando notificación de pago completado");
     }
   }
 

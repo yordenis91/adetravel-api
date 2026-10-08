@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { logger } from "../utils/logger";
 
 interface ActivityLogInput {
   action: "CREATE" | "UPDATE" | "DELETE" | "SYNC_API";
@@ -25,10 +26,6 @@ export async function createActivityLog(input: ActivityLogInput): Promise<void> 
   });
 } catch (error) {
     // 🔥 Falla silenciosa: El logger nunca debe revertir la operación principal
-    console.error("[ActivityLogger] Error registrando actividad:", {
-      action: input.action,
-      entityId: input.entityId,
-      error: (error as Error).message
-    });
+    logger.error({ err: error, action: input.action, entityId: input.entityId }, "[ActivityLogger] Error registrando actividad");
   }
 }
