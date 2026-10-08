@@ -248,7 +248,7 @@ de un contenedor dan el mismo tamaño y uso).
 `HEALTHCHECK` del Dockerfile solo reinicia el contenedor. Hace falta un servicio que consulte
 `https://<api>/api/health` cada 1-5 minutos desde fuera del servidor y avise por correo, por ejemplo
 UptimeRobot, Better Stack o healthchecks.io. `/api/health` devuelve 200 solo si la base responde a `SELECT 1` y no consume el límite de peticiones. Conviene vigilar también la URL
-del cliente. Crear la cuenta del monitor es tarea del administrador.
+del cliente, con una palabra clave de la página; el estado 200 por sí solo no basta. Crear la cuenta del monitor es tarea del administrador.
 
 **Correo de las alertas:** pasa por `sendEmail`, así que respeta `EMAIL_DELIVERY` (con `redirect` llega a
 `EMAIL_REDIRECT_TO`; con `off` solo queda en el log y en Sentry). Si el SMTP es lo que falla, el aviso
@@ -313,8 +313,12 @@ La base de producción se crea **vacía**; no se clona la demo (ver el plan de m
 
 1. Postgres nuevo y servicio de la API con todas las variables de la "Lista de comprobación de salida".
    Los secretos los escribe el administrador en Easypanel; nunca van al repositorio ni a un chat.
-2. Cliente en el mismo dominio con la ruta `/api` apuntando a la API (como en la demo), o bien
-   `VITE_API_URL` como argumento de build. `FRONTEND_URL` de la API debe ser la URL pública del cliente.
+2. Cliente: `VITE_API_URL` (URL pública de la API terminada en `/api`) y `VITE_SENTRY_DSN` se definen
+   como variables del servicio del cliente en Easypanel; Vite las incorpora **al construir**, así que
+   cambiarlas exige redesplegar. En la demo funciona así (el bundle lleva la URL de la API) aunque el
+   Dockerfile no declare `ARG`. Sin `VITE_API_URL` el cliente usa `/api` en su propio dominio, y ese
+   dominio no enruta a la API (devuelve el `index.html`), así que la variable es obligatoria.
+   `FRONTEND_URL` de la API debe ser la URL pública del cliente.
 3. Desplegar la API: al arrancar crea todas las tablas. Comprobar `GET /api/health` = 200.
 4. Crear el primer administrador desde la terminal del servicio de la API en Easypanel (la imagen de
    producción no trae `ts-node`, por eso no sirve `seed:admin`):
@@ -329,7 +333,7 @@ La base de producción se crea **vacía**; no se clona la demo (ver el plan de m
 
 ### Después de cada despliegue (humo, 5 minutos)
 
-- [ ] `GET /api/health` = 200 y el cliente carga.
+- [ ] `GET <api>/api/health` = 200 con cuerpo JSON y el cliente carga. No probar `/api/health` sobre el dominio del cliente: responde 200 con HTML (el `index.html`) aunque la API esté caída.
 - [ ] Iniciar sesión, abrir una solicitud y una lista.
 - [ ] Los logs del servicio no muestran errores al arrancar ni `Migration ... failed`.
 - [ ] Sentry sin errores nuevos en los primeros minutos.
