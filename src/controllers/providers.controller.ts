@@ -32,6 +32,20 @@ export async function listProviders(req: Request, res: Response): Promise<void> 
   sendList(res, data, total, page, limit);
 }
 
+// Sin paginar a propósito: los selectores necesitan todos los proveedores (una agencia tiene
+// decenas, no miles). Solo datos no sensibles; los inactivos van marcados para que el cliente
+// los muestre en registros antiguos pero no los ofrezca en altas nuevas.
+const PROVIDER_OPTIONS_MAX = 1000;
+
+export async function listProviderOptions(_req: Request, res: Response): Promise<void> {
+  const data = await prisma.provider.findMany({
+    select: { id: true, name: true, fantasyName: true, isActive: true },
+    orderBy: { name: "asc" },
+    take: PROVIDER_OPTIONS_MAX
+  });
+  sendItem(res, data);
+}
+
 export async function getProvider(req: Request, res: Response): Promise<void> {
   const providerId = String(String(req.params.id));
   const item = await prisma.provider.findUnique({ where: { id: providerId } });
