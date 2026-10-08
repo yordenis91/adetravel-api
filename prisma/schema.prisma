@@ -491,6 +491,12 @@ model SystemConfig {
   exchangeLastAttemptAt        DateTime?
   exchangeLastSyncAt           DateTime?
   exchangeLastSyncError        String?
+  // Documentos legales públicos (/legal/*). HTML ya sanitizado; null = se muestra el texto por defecto.
+  // Los *UpdatedAt los escribe solo el servidor cuando cambia el contenido.
+  termsOfServiceHtml           String?  @db.Text
+  termsOfServiceUpdatedAt      DateTime?
+  privacyPolicyHtml            String?  @db.Text
+  privacyPolicyUpdatedAt       DateTime?
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 
