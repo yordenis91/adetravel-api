@@ -6,6 +6,7 @@ import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { generateNumber } from "../services/numbering.service";
 import { advanceWorkflowStatus } from "../services/workflow.service";
+import { isAtOrAfter } from "../validators/workflow-status";
 
 export async function listConfirmations(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -60,6 +61,21 @@ export async function createConfirmation(req: Request, res: Response): Promise<v
   if (data.serviceId) {
     service = await prisma.service.findFirst({ where: { id: data.serviceId, requestId: data.requestId } });
     if (!service) throw new ApiError("El servicio no pertenece a la solicitud indicada", 400);
+  }
+
+  // El proveedor solo confirma lo que el cliente ya aceptó: antes de ACEPTADA_POR_CLIENTE la
+  // confirmación saltaría etapas del flujo (cotizar, enviar, aceptar). Se mira el Servicio si viene
+  // informado; si no, la Solicitud (caso Paquete).
+  const stage = service ? service.status : request.status;
+  if (stage === "CANCELADA") {
+    throw new ApiError("No se pueden registrar confirmaciones sobre un servicio cancelado", 409, "CONFIRMATION_NOT_ALLOWED");
+  }
+  if (!isAtOrAfter(stage, "ACEPTADA_POR_CLIENTE")) {
+    throw new ApiError(
+      `El cliente aún no ha aceptado (estado actual: ${stage}); la confirmación del proveedor va después de la aceptación`,
+      409,
+      "CONFIRMATION_TOO_EARLY"
+    );
   }
 
   const config = await prisma.systemConfig.findFirst();

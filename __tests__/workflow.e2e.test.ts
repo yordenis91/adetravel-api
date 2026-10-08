@@ -267,6 +267,31 @@ describe("flujo de trabajo de Solicitud y Servicio (integración con Postgres)",
       expect(Number(svc.price)).toBe(150000);
       expect(await statusOf("request", req.id)).toBe("CONFIRMADA_POR_PROVEEDOR");
     });
+
+    it("no registra una confirmación antes de que el cliente acepte ni sobre un servicio cancelado", async () => {
+      const { req, services } = await newRequest({ services: 2 });
+      await prisma.service.update({ where: { id: services[0].id }, data: { status: "COTIZADO_POR_ADETRAVEL" } });
+
+      const pronto = await post("ops", "/api/confirmations", { requestId: req.id, serviceId: services[0].id, providerId: provider.id, price: 10 });
+      expect(pronto.status).toBe(409);
+      expect(pronto.body.error?.code ?? pronto.body.code).toBe("CONFIRMATION_TOO_EARLY");
+      expect(await statusOf("service", services[0].id)).toBe("COTIZADO_POR_ADETRAVEL");
+      expect(await prisma.confirmation.count({ where: { requestId: req.id } })).toBe(0);
+
+      await prisma.service.update({ where: { id: services[1].id }, data: { status: "CANCELADA" } });
+      const cancelado = await post("ops", "/api/confirmations", { requestId: req.id, serviceId: services[1].id, providerId: provider.id, price: 10 });
+      expect(cancelado.status).toBe(409);
+    });
+
+    it("en un paquete aceptado, la confirmación sin servicio avanza la solicitud", async () => {
+      const { req, services } = await newRequest({ isPackage: true, services: 1 });
+      await prisma.request.update({ where: { id: req.id }, data: { status: "ACEPTADA_POR_CLIENTE" } });
+
+      const res = await post("ops", "/api/confirmations", { requestId: req.id, providerId: provider.id, price: 99 });
+      expect(res.status).toBe(201);
+      expect(await statusOf("request", req.id)).toBe("CONFIRMADA_POR_PROVEEDOR");
+      expect(await statusOf("service", services[0].id)).toBe("CONFIRMADA_POR_PROVEEDOR");
+    });
   });
 
   describe("vouchers", () => {
