@@ -272,8 +272,9 @@ describe("flujo de trabajo de Solicitud y Servicio (integración con Postgres)",
   describe("vouchers", () => {
     beforeEach(() => (email.sendTemplateEmail as jest.Mock).mockClear());
 
-    it("borrador → emitido exige datos completos y avisa al cliente (correo simulado)", async () => {
+    it("borrador → emitido exige datos completos, avisa al cliente (correo simulado) y avanza la solicitud", async () => {
       const { req } = await newRequest();
+      await prisma.request.update({ where: { id: req.id }, data: { status: "PAGADO_AL_PROVEEDOR" } });
       const created = await post("ops", "/api/vouchers", { requestId: req.id, serviceName: "Hotel Prueba" });
       expect(created.status).toBe(201);
       expect(created.body.data.status).toBe("BORRADOR");
@@ -287,6 +288,7 @@ describe("flujo de trabajo de Solicitud y Servicio (integración con Postgres)",
       expect(completar.status).toBe(200);
       const emitido = await patch("ops", `/api/vouchers/${id}/status`, { status: "EMITIDO" });
       expect(emitido.status).toBe(200);
+      expect(await statusOf("request", req.id)).toBe("VOUCHER_EMITIDO");
 
       const config = await prisma.systemConfig.findFirst();
       if (config?.notifyOnVoucherIssued !== false) {
@@ -298,6 +300,29 @@ describe("flujo de trabajo de Solicitud y Servicio (integración con Postgres)",
       expect((await patch("ops", `/api/vouchers/${id}`, { serviceName: "Otro" })).status).toBe(409);
       expect((await request(app).delete(`/api/vouchers/${id}`).set("Authorization", `Bearer ${token("admin")}`)).status).toBe(409);
       expect((await patch("ops", `/api/vouchers/${id}/status`, { status: "BORRADOR" })).status).toBe(200);
+      // Volver a borrador no hace retroceder la solicitud.
+      expect(await statusOf("request", req.id)).toBe("VOUCHER_EMITIDO");
+    });
+
+    it("no emite antes del pago al proveedor ni sobre una solicitud cancelada", async () => {
+      const completo = { serviceName: "Hotel", checkIn: "2026-12-01", checkOut: "2026-12-05", destination: "Cusco", providerId: provider.id };
+      for (const [status, code] of [["PAGADO_POR_CLIENTE", "VOUCHER_TOO_EARLY"], ["CANCELADA", "REQUEST_CANCELLED"]]) {
+        const { req } = await newRequest();
+        await prisma.request.update({ where: { id: req.id }, data: { status } });
+        const v = await post("ops", "/api/vouchers", { requestId: req.id, ...completo });
+        const res = await patch("ops", `/api/vouchers/${v.body.data.id}/status`, { status: "EMITIDO" });
+        expect({ status, code: res.status, error: res.body.error?.code ?? res.body.code }).toEqual({ status, code: 409, error: code });
+        expect(await statusOf("request", req.id)).toBe(status);
+      }
+      expect(email.sendTemplateEmail).not.toHaveBeenCalled();
+    });
+
+    it("emitir con la solicitud ya más avanzada no la hace retroceder", async () => {
+      const { req } = await newRequest();
+      await prisma.request.update({ where: { id: req.id }, data: { status: "VOUCHER_ENTREGADO" } });
+      const v = await post("ops", "/api/vouchers", { requestId: req.id, serviceName: "Tour", checkIn: "2026-12-01", checkOut: "2026-12-02", destination: "Lima", providerId: provider.id });
+      expect((await patch("ops", `/api/vouchers/${v.body.data.id}/status`, { status: "EMITIDO" })).status).toBe(200);
+      expect(await statusOf("request", req.id)).toBe("VOUCHER_ENTREGADO");
     });
 
     it("un voucher cancelado solo vuelve a borrador", async () => {

@@ -8,6 +8,8 @@ import { sendTemplateEmail } from "../services/email.service";
 import { generateNumber } from "../services/numbering.service";
 import { generateVoucherPdfBuffer } from "../services/pdf.service";
 import { VALID_TRANSITIONS } from "../validators/vouchers.validator";
+import { advanceWorkflowStatus } from "../services/workflow.service";
+import { isAtOrAfter } from "../validators/workflow-status";
 
 export async function listVouchers(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
@@ -138,7 +140,7 @@ export async function changeVoucherStatus(req: Request, res: Response): Promise<
   const id = String(req.params.id);
   const newStatus = req.body.status.toUpperCase();
 
-  const existing = await prisma.voucher.findUnique({ where: { id }, include: { client: true, provider: true } });
+  const existing = await prisma.voucher.findUnique({ where: { id }, include: { client: true, provider: true, request: true } });
   if (!existing) throw new ApiError("Voucher no encontrado", 404);
 
   const currentStatus = existing.status.toUpperCase();
@@ -152,6 +154,20 @@ export async function changeVoucherStatus(req: Request, res: Response): Promise<
     if (!existing.serviceName || !existing.checkIn || !existing.checkOut || !existing.destination || !existing.providerId) {
       throw new ApiError("El voucher no tiene todos los datos requeridos (Servicio, Fechas, Destino y Operador) para ser emitido.", 400);
     }
+
+    // Emitir el voucher mueve la Solicitud a VOUCHER_EMITIDO (decisión del administrador). Para no
+    // saltar etapas, la Solicitud tiene que estar ya pagada al proveedor.
+    const requestStatus = existing.request.status;
+    if (requestStatus === "CANCELADA") {
+      throw new ApiError("La solicitud está cancelada: no se pueden emitir vouchers", 409, "REQUEST_CANCELLED");
+    }
+    if (!isAtOrAfter(requestStatus, "PAGADO_AL_PROVEEDOR")) {
+      throw new ApiError(
+        `La solicitud aún no está pagada al proveedor (estado actual: ${requestStatus}); el voucher se emite después del pago`,
+        409,
+        "VOUCHER_TOO_EARLY"
+      );
+    }
   }
 
   const updated = await prisma.voucher.update({
@@ -159,6 +175,12 @@ export async function changeVoucherStatus(req: Request, res: Response): Promise<
     data: { status: newStatus as any },
     include: { client: true, request: true, provider: true }
   });
+
+  // Avanza solo hacia delante: devolver el voucher a borrador o cancelarlo no hace retroceder la
+  // Solicitud (eso se corrige a mano con el cambio de estado de la Solicitud).
+  if (newStatus === "EMITIDO") {
+    await advanceWorkflowStatus(existing.requestId, null, "VOUCHER_EMITIDO");
+  }
 
   // Envío de email si se emite (respeta el switch "Voucher emitido" de Configuración > Email)
   const config = await prisma.systemConfig.findFirst();
