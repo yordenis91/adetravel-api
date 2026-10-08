@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { passwordSchema } from "../utils/password-policy";
 
 // Alineado con el enum `AgencyRole` en prisma/schema.prisma
 export const AGENCY_ROLES = ["GERENTE", "FINANZAS", "OPERACIONES", "AGENTE_VENTAS"] as const;
@@ -15,7 +16,8 @@ export const usersListQuerySchema = z.object({
 export const updateUserSchema = z.object({
   fullName: z.string().min(3).optional(),
   email: z.string().email().optional(),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres").optional(),
+  // Misma política que registro, invitación y cambio de contraseña (antes solo exigía 8 caracteres).
+  password: passwordSchema.optional(),
   role: z.enum(SYSTEM_ROLES).optional(),
   agencyRole: z.enum(AGENCY_ROLES).optional().nullable(),
   isActive: z.boolean().optional(),
