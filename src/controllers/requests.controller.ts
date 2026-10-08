@@ -152,6 +152,8 @@ export async function changeRequestStatus(req: Request, res: Response): Promise<
 
   const updateData: Record<string, unknown> = { status: newStatus };
   if (newStatus === "CANCELADA") updateData.cancellationReason = cancellationReason;
+  const isReactivation = currentStatus === "CANCELADA" && newStatus === "RECEPCIONADA";
+  if (isReactivation) updateData.cancellationReason = null;
 
   const updated = await prisma.request.update({ where: { id }, data: updateData as never });
 
@@ -159,7 +161,20 @@ export async function changeRequestStatus(req: Request, res: Response): Promise<
   // los que descienden automáticamente (ver CASCADE_DOWN_STATUSES en workflow-status.ts).
   await syncServicesOnRequestStatusChange(id, newStatus, existing.isPackage);
 
+  // Reactivar la Solicitud reactiva también sus Servicios cancelados (decisión del administrador):
+  // vuelven a RECEPCIONADA para revisarlos, y desde ahí se pueden modificar, eliminar (si no tienen
+  // cotizaciones ni confirmaciones) o volver a cancelar uno a uno.
+  let reactivatedServices = 0;
+  if (isReactivation) {
+    const result = await prisma.service.updateMany({
+      where: { requestId: id, status: "CANCELADA" },
+      data: { status: "RECEPCIONADA", cancellationReason: null },
+    });
+    reactivatedServices = result.count;
+  }
+
   let logDescription = `Cambio de estado: ${currentStatus} -> ${newStatus}`;
+  if (reactivatedServices > 0) logDescription += ` — Servicios reactivados: ${reactivatedServices}`;
   if (notes) logDescription += ` — Nota: ${notes}`;
   else if (cancellationReason) logDescription += ` — Motivo: ${cancellationReason}`;
 
@@ -169,7 +184,7 @@ export async function changeRequestStatus(req: Request, res: Response): Promise<
     performedBy: req.user!.id
   });
 
-  sendItem(res, updated);
+  sendItem(res, isReactivation ? { ...updated, reactivatedServices } : updated);
 }
 
 export async function duplicateRequest(req: Request, res: Response): Promise<void> {
