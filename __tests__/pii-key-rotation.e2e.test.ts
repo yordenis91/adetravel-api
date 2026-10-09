@@ -7,7 +7,7 @@ import { rotatePiiKey } from "../src/ops/rotate-pii-key";
 
 const OLD = crypto.randomBytes(32).toString("hex");
 const NEW = crypto.randomBytes(32).toString("hex");
-const DB = "adetravel_rotation_test";
+const DB = `adetravel_rotation_${process.pid}_test`; // único por proceso: dos corridas simultáneas no se pisan
 const base = (process.env.DATABASE_URL ?? "").replace(/[?&]schema=[^&]*/, "");
 const adminUrl = base.replace(/\/[^/]+$/, "/postgres");
 const dbUrl = base.replace(/\/[^/]+$/, `/${DB}`);

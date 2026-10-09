@@ -31,6 +31,9 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
 
 - `npm test`: unitarios (sin base de datos) y, si hay una base migrada en `DATABASE_URL`, también los e2e.
 - `npm run test:e2e`: solo los e2e (`__tests__/*.e2e.test.ts`) contra un Postgres 17 local desechable. El script crea o arranca el contenedor `adtv-dev-pg` (127.0.0.1:55432), aplica las migraciones y corre los tests. Ignora el `DATABASE_URL` del entorno para no tocar una base real; para usar otra define `TEST_DATABASE_URL` (solo local y con nombre terminado en `_test`).
+- **Aislamiento entre corridas:** con la base por defecto, cada `npm run test:e2e` crea su propia base `adetravel_<pid>_test` dentro de `adtv-dev-pg`, la migra y la borra al terminar (también limpia las huérfanas de corridas que murieron). Así dos corridas simultáneas (otra terminal u otra sesión) no se pisan los datos; antes compartían `adetravel_test` y daban fallos intermitentes. Con `TEST_DATABASE_URL` se usa esa base tal cual y no se crea nada. La suite `pii-key-rotation` también usa una base propia con el PID en el nombre.
+- No lances varias corridas completas a la vez en el servidor de la demo (7,7 GB de RAM compartidos con Easypanel): puede provocar OOM y reiniciar los contenedores. Si necesitas paralelismo, usa `npm run test:e2e -- --maxWorkers=2`.
+- `npm test` a secas también ejecuta los e2e sin base ni migraciones y falla: para los unitarios usa `npx jest --testPathIgnorePatterns e2e`.
 - Si un e2e falla con `The table public.users does not exist`, la base no tiene migraciones: usa `npm run test:e2e`.
 
 ## Endpoints base

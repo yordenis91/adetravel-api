@@ -47,6 +47,22 @@ if [[ "$URL" == "$DEFAULT_URL" ]]; then
   docker exec "$CONTAINER" pg_isready -U test -d adetravel_test >/dev/null
 fi
 
+# Con la base por defecto cada corrida usa su propia base (adetravel_<pid>_test), que se borra al
+# terminar: así dos corridas simultáneas (otra terminal, otra sesión) no se pisan los datos.
+RUN_DB=""
+if [[ "$URL" == "$DEFAULT_URL" ]]; then
+  RUN_DB="adetravel_$$_test"
+  # Limpia bases huérfanas de corridas que murieron sin ejecutar el trap (su PID ya no existe).
+  for old in $(docker exec "$CONTAINER" psql -U test -d postgres -Atc "select datname from pg_database where datname ~ '^adetravel_[0-9]+_test\$'"); do
+    pid="${old#adetravel_}"; pid="${pid%_test}"
+    kill -0 "$pid" 2>/dev/null || docker exec "$CONTAINER" psql -U test -d postgres -qc "drop database if exists \"$old\" with (force)" >/dev/null
+  done
+  docker exec "$CONTAINER" psql -U test -d postgres -qc "create database \"$RUN_DB\"" >/dev/null
+  cleanup() { docker exec "$CONTAINER" psql -U test -d postgres -qc "drop database if exists \"$RUN_DB\" with (force)" >/dev/null 2>&1 || true; }
+  trap cleanup EXIT
+  URL="${DEFAULT_URL/\/adetravel_test?/\/$RUN_DB?}"
+fi
+
 export DATABASE_URL="$URL"
 echo "test-e2e: migrando ${URL%%\?*}"
 npx prisma migrate deploy
