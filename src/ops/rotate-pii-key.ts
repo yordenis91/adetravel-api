@@ -1,5 +1,6 @@
 import { Client } from "pg";
 import { decryptPII, encryptPII, isEncryptedPII } from "../lib/pii-encryption";
+import { ENCRYPTED_SERVICE_DETAIL_KEYS } from "../lib/service-pii-extension";
 
 /**
  * Rotación de PII_ENCRYPTION_KEY: vuelve a cifrar con la clave nueva todo lo que está cifrado con la
@@ -24,12 +25,37 @@ export interface RotationReport {
 interface Target {
   table: string;
   columns: string[];
+  // Claves cifradas dentro de una columna JSON (p. ej. services.details).
+  jsonKeys?: Record<string, readonly string[]>;
+}
+
+interface Slot {
+  column: string;
+  jsonKey?: string;
+  value: string | null;
 }
 
 const TARGETS: Target[] = [
   { table: "clients", columns: ["passportNumber", "bankAccount", "bankAccountHolder"] },
   { table: "system_config", columns: ["smtpPassword"] },
+  { table: "services", columns: [], jsonKeys: { details: ENCRYPTED_SERVICE_DETAIL_KEYS } },
 ];
+
+const selectList = (t: Target) => [...t.columns, ...Object.keys(t.jsonKeys ?? {})].map((c) => `"${c}"`).join(", ");
+
+// Valores cifrables de una fila: columnas directas y claves dentro de columnas JSON.
+function slotsOf(t: Target, row: Record<string, any>): Slot[] {
+  const slots: Slot[] = t.columns.map((column) => ({ column, value: row[column] as string | null }));
+  for (const [column, keys] of Object.entries(t.jsonKeys ?? {})) {
+    const json = row[column];
+    if (!json || typeof json !== "object") continue;
+    for (const jsonKey of keys) {
+      const v = json[jsonKey];
+      if (typeof v === "string") slots.push({ column, jsonKey, value: v });
+    }
+  }
+  return slots;
+}
 
 const decryptsWith = (value: string, keyHex: string) => {
   const out = decryptPII(value, keyHex);
@@ -51,16 +77,16 @@ export async function rotatePiiKey(options: {
   const db = new Client({ connectionString: options.databaseUrl.replace(/[?&]schema=[^&]*/, "") });
   await db.connect();
   const report: RotationReport = { scanned: 0, toRotate: 0, alreadyNew: 0, plaintext: 0, undecryptable: 0, rotated: 0, dryRun };
-  const updates: Array<{ table: string; column: string; id: string; value: string }> = [];
+  const updates: Array<{ table: string; column: string; jsonKey?: string; id: string; value: string }> = [];
 
   try {
-    for (const { table, columns } of TARGETS) {
+    for (const target of TARGETS) {
+      const { table } = target;
       const exists = (await db.query(`SELECT to_regclass($1) AS r`, [`public.${table}`])).rows[0].r;
       if (!exists) continue;
-      const rows = (await db.query(`SELECT id, ${columns.map((c) => `"${c}"`).join(", ")} FROM "${table}"`)).rows;
+      const rows = (await db.query(`SELECT id, ${selectList(target)} FROM "${table}"`)).rows;
       for (const row of rows) {
-        for (const column of columns) {
-          const value = row[column] as string | null;
+        for (const { column, jsonKey, value } of slotsOf(target, row)) {
           if (!value) continue;
           report.scanned++;
           if (!isEncryptedPII(value)) {
@@ -77,7 +103,7 @@ export async function rotatePiiKey(options: {
             continue;
           }
           report.toRotate++;
-          updates.push({ table, column, id: row.id, value: encryptPII(plain, newKey)! });
+          updates.push({ table, column, jsonKey, id: row.id, value: encryptPII(plain, newKey)! });
         }
       }
     }
@@ -90,16 +116,20 @@ export async function rotatePiiKey(options: {
     await db.query("BEGIN");
     try {
       for (const u of updates) {
-        await db.query(`UPDATE "${u.table}" SET "${u.column}" = $1 WHERE id = $2`, [u.value, u.id]);
+        if (u.jsonKey) {
+          await db.query(`UPDATE "${u.table}" SET "${u.column}" = jsonb_set("${u.column}"::jsonb, ARRAY[$1]::text[], to_jsonb($2::text)) WHERE id = $3`, [u.jsonKey, u.value, u.id]);
+        } else {
+          await db.query(`UPDATE "${u.table}" SET "${u.column}" = $1 WHERE id = $2`, [u.value, u.id]);
+        }
       }
       // Verificación dentro de la transacción: todo lo cifrado debe descifrarse con la nueva.
-      for (const { table, columns } of TARGETS) {
+      for (const target of TARGETS) {
+        const { table } = target;
         const exists = (await db.query(`SELECT to_regclass($1) AS r`, [`public.${table}`])).rows[0].r;
         if (!exists) continue;
-        const rows = (await db.query(`SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${table}"`)).rows;
+        const rows = (await db.query(`SELECT ${selectList(target)} FROM "${table}"`)).rows;
         for (const row of rows) {
-          for (const column of columns) {
-            const v = row[column] as string | null;
+          for (const { column, value: v } of slotsOf(target, row)) {
             if (v && isEncryptedPII(v) && decryptsWith(v, newKey) === null) {
               throw new Error(`Verificación fallida en ${table}.${column}: se deshace la rotación`);
             }
