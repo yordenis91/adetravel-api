@@ -26,6 +26,7 @@ describe("rotación de PII_ENCRYPTION_KEY (integración con Postgres)", () => {
     db = new Client({ connectionString: dbUrl });
     await db.connect();
     await db.query(`CREATE TABLE clients (id text PRIMARY KEY, "passportNumber" text, "bankAccount" text, "bankAccountHolder" text)`);
+    await db.query(`CREATE TABLE services (id text PRIMARY KEY, details jsonb)`);
     await db.query(`CREATE TABLE system_config (id text PRIMARY KEY, "smtpPassword" text)`);
   });
 
@@ -40,6 +41,10 @@ describe("rotación de PII_ENCRYPTION_KEY (integración con Postgres)", () => {
   beforeEach(async () => {
     await db.query("DELETE FROM clients");
     await db.query("DELETE FROM system_config");
+    await db.query("DELETE FROM services");
+    await db.query(`INSERT INTO services VALUES ('s1', $1)`, [
+      JSON.stringify({ fullName: "Persona", passportNumber: encryptPII("P-SVC-1", OLD), rut: encryptPII("11.111.111-1", OLD) }),
+    ]);
     for (const id of ["c1", "c2"]) {
       await db.query(`INSERT INTO clients VALUES ($1, $2, $3, $4)`, [
         id,
@@ -61,18 +66,22 @@ describe("rotación de PII_ENCRYPTION_KEY (integración con Postgres)", () => {
   it("--dry-run cuenta pero no escribe", async () => {
     const before = await all();
     const r = await rotatePiiKey({ databaseUrl: dbUrl, oldKey: OLD, newKey: NEW, dryRun: true });
-    expect(r).toMatchObject({ toRotate: 6, alreadyNew: 0, plaintext: 1, rotated: 0, dryRun: true });
+    expect(r).toMatchObject({ toRotate: 8, alreadyNew: 0, plaintext: 1, rotated: 0, dryRun: true });
     expect(await all()).toEqual(before);
   });
 
   it("re-cifra todo con la clave nueva; la vieja deja de servir; el texto plano no se toca", async () => {
     const r = await rotatePiiKey({ databaseUrl: dbUrl, oldKey: OLD, newKey: NEW });
-    expect(r).toMatchObject({ toRotate: 6, rotated: 6, plaintext: 1 });
+    expect(r).toMatchObject({ toRotate: 8, rotated: 8, plaintext: 1 });
     const { c, s } = await all();
     expect(decryptPII(c[0].passportNumber, NEW)).toBe(PLAIN.passportNumber);
     expect(decryptPII(c[0].bankAccountHolder, NEW)).toBe(PLAIN.bankAccountHolder);
     expect(decryptPII(c[1].bankAccount, NEW)).toBe(PLAIN.bankAccount);
     expect(decryptPII(s.smtpPassword, NEW)).toBe("Smtp-Clave-1");
+    const svc = (await db.query(`SELECT details FROM services WHERE id = 's1'`)).rows[0].details;
+    expect(decryptPII(svc.passportNumber, NEW)).toBe("P-SVC-1");
+    expect(decryptPII(svc.rut, NEW)).toBe("11.111.111-1");
+    expect(svc.fullName).toBe("Persona"); // el resto del JSON no se toca
     expect(decryptPII(c[0].passportNumber, OLD)).toBe(c[0].passportNumber); // con la vieja ya no descifra
     expect(c[2].passportNumber).toBe("en-claro-antiguo");
   });
@@ -81,7 +90,7 @@ describe("rotación de PII_ENCRYPTION_KEY (integración con Postgres)", () => {
     await rotatePiiKey({ databaseUrl: dbUrl, oldKey: OLD, newKey: NEW });
     const after = await all();
     const r = await rotatePiiKey({ databaseUrl: dbUrl, oldKey: OLD, newKey: NEW });
-    expect(r).toMatchObject({ toRotate: 0, alreadyNew: 6, rotated: 0 });
+    expect(r).toMatchObject({ toRotate: 0, alreadyNew: 8, rotated: 0 });
     expect(await all()).toEqual(after);
   });
 
