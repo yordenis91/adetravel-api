@@ -6,12 +6,14 @@
  * Antes de correrlo en producción: PII_ENCRYPTION_KEY definida (la misma de la app),
  * backup de la base y una pasada con --dry-run.
  *
- *   npx ts-node prisma/scripts/encrypt-existing-service-pii.ts --dry-run
- *   npx ts-node prisma/scripts/encrypt-existing-service-pii.ts
+ * Se ejecuta compilado (la imagen de producción no trae ts-node):
+ *   node dist/ops/encrypt-existing-service-pii.js --dry-run
+ *   node dist/ops/encrypt-existing-service-pii.js
+ * En local: npm run pii:encrypt-services-backfill -- --dry-run (tras npm run build)
  */
-import { prisma } from "../../src/lib/prisma";
-import { encryptPII, isEncryptedPII } from "../../src/lib/pii-encryption";
-import { ENCRYPTED_SERVICE_DETAIL_KEYS } from "../../src/lib/service-pii-extension";
+import { prisma } from "../lib/prisma";
+import { encryptPII, isEncryptedPII } from "../lib/pii-encryption";
+import { ENCRYPTED_SERVICE_DETAIL_KEYS } from "../lib/service-pii-extension";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
