@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem } from "../utils/response";
+import { getDashboardTrends } from "../services/dashboard-trends.service";
 
 export async function getReport(req: Request, res: Response): Promise<void> {
   const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
@@ -71,6 +72,9 @@ export async function getReport(req: Request, res: Response): Promise<void> {
     }
   });
 
+  // Tendencias del panel: últimos 30 días frente a los 30 anteriores (independientes del filtro de fechas).
+  const trends = await getDashboardTrends();
+
   // 3. Responder con el mega-paquete de datos
   sendItem(res, {
     summary: {
@@ -84,6 +88,7 @@ export async function getReport(req: Request, res: Response): Promise<void> {
     quotationsByStatus,
     paymentsByMethod,
     clientsBySource,
-    recentConfirmed
+    recentConfirmed,
+    trends
   });
 }

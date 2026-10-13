@@ -9,6 +9,10 @@ jest.mock("../../../src/services/activity-log.service", () => ({
   createActivityLog: mockCreateActivityLog,
 }));
 
+// La coincidencia sin tildes es SQL crudo (se prueba en accent-search.test.ts y en el e2e): aquí solo importa cómo se usa.
+const mockIds = jest.fn();
+jest.mock("../../../src/lib/accent-search", () => ({ idsMatchingSearch: (...args: unknown[]) => mockIds(...args) }));
+
 import {
   listClients,
   getClient,
@@ -27,6 +31,7 @@ function buildReq(overrides: Partial<Request> = {}): Request {
 describe("clients.controller (PII)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIds.mockResolvedValue(["c-1", "c-2"]);
   });
 
   describe("listClients", () => {
@@ -37,27 +42,34 @@ describe("clients.controller (PII)", () => {
 
       await listClients(req, createMockRes());
 
+      // Se buscan los ids con las columnas por defecto de "clients", que no incluyen passportNumber
+      // (verificado en accent-search.test.ts); el where no puede tener una cláusula de pasaporte.
+      expect(mockIds).toHaveBeenCalledWith("clients", "P1234567");
       const args = mockPrisma.client.findMany.mock.calls[0][0];
-      for (const clause of args.where.OR) {
-        expect(clause).not.toHaveProperty("passportNumber");
-      }
+      expect(JSON.stringify(args.where)).not.toContain("passportNumber");
     });
 
-    it("busca por texto en nombre, apellido, email, teléfono y RUT", async () => {
+    it("busca por texto ignorando tildes: filtra por los ids que devuelve la coincidencia", async () => {
       mockPrisma.client.findMany.mockResolvedValue([]);
       mockPrisma.client.count.mockResolvedValue(0);
       const req = buildReq({ query: { search: "Ana" } as any });
 
       await listClients(req, createMockRes());
 
+      expect(mockIds).toHaveBeenCalledWith("clients", "Ana");
       const args = mockPrisma.client.findMany.mock.calls[0][0];
-      expect(args.where.OR).toEqual([
-        { firstName: { contains: "Ana", mode: "insensitive" } },
-        { lastName: { contains: "Ana", mode: "insensitive" } },
-        { email: { contains: "Ana", mode: "insensitive" } },
-        { phone: { contains: "Ana", mode: "insensitive" } },
-        { rut: { contains: "Ana", mode: "insensitive" } },
-      ]);
+      expect(args.where.id).toEqual({ in: ["c-1", "c-2"] });
+      expect(args.where).not.toHaveProperty("OR");
+    });
+
+    it("sin búsqueda no consulta ids ni filtra por id", async () => {
+      mockPrisma.client.findMany.mockResolvedValue([]);
+      mockPrisma.client.count.mockResolvedValue(0);
+
+      await listClients(buildReq(), createMockRes());
+
+      expect(mockIds).not.toHaveBeenCalled();
+      expect(mockPrisma.client.findMany.mock.calls[0][0].where).not.toHaveProperty("id");
     });
 
     it("filtra por isActive convirtiendo el string de query a boolean", async () => {
