@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { createActivityLog } from "../services/activity-log.service";
@@ -19,13 +20,8 @@ export async function listClients(req: Request, res: Response): Promise<void> {
     // client-pii-extension.ts), Postgres ya no puede hacer un LIKE parcial
     // contra la columna (el mismo valor cifrado dos veces da un resultado
     // distinto cada vez).
-    where.OR = [
-      { firstName: { contains: search, mode: "insensitive" } },
-      { lastName: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } },
-      { phone: { contains: search, mode: "insensitive" } },
-      { rut: { contains: search, mode: "insensitive" } },
-    ];
+    // Ignora tildes y mayúsculas ("tomas" encuentra "Tomás"): ver lib/accent-search.ts.
+    where.id = { in: await idsMatchingSearch("clients", search) };
   }
 
   if (isActive !== undefined) {

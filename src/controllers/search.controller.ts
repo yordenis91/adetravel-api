@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { sendItem } from "../utils/response";
 import { asyncHandler } from "../utils/async-handler";
 import { getEffectivePermissions } from "../config/permissions";
+import { idsMatchingSearch } from "../lib/accent-search";
 
 export const globalSearch = asyncHandler(async (req: Request, res: Response) => {
   const q = req.query.q as string;
@@ -24,27 +25,14 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response) => 
   const [clients, requests, quotations, payments, vouchers] = await Promise.all([
     // 1. Buscar Clientes
     !can("VIEW_CLIENTS") ? [] : prisma.client.findMany({
-      where: {
-        OR: [
-          { firstName: { contains: q, mode: "insensitive" } },
-          { lastName: { contains: q, mode: "insensitive" } },
-          { rut: { contains: q, mode: "insensitive" } },
-          { email: { contains: q, mode: "insensitive" } }
-        ]
-      },
+      where: { id: { in: await idsMatchingSearch("clients", q, { limit: 5, columns: ["firstName", "lastName", "rut", "email"] }) } },
       take: 5,
       select: { id: true, firstName: true, lastName: true, email: true, rut: true }
     }),
     
     // 2. Buscar Solicitudes
     !can("VIEW_REQUESTS") ? [] : prisma.request.findMany({
-      where: {
-        OR: [
-          { requestNumber: { contains: q, mode: "insensitive" } },
-          { destinationCity: { contains: q, mode: "insensitive" } },
-          { originCity: { contains: q, mode: "insensitive" } }
-        ]
-      },
+      where: { id: { in: await idsMatchingSearch("requests", q, { limit: 5 }) } },
       take: 5,
       select: { id: true, requestNumber: true, destinationCity: true, status: true }
     }),
@@ -70,13 +58,7 @@ export const globalSearch = asyncHandler(async (req: Request, res: Response) => 
 
     // 5. Buscar Vouchers
     !can("VIEW_VOUCHERS") ? [] : prisma.voucher.findMany({
-      where: {
-        OR: [
-          { voucherNumber: { contains: q, mode: "insensitive" } },
-          { serviceName: { contains: q, mode: "insensitive" } },
-          { confirmationCode: { contains: q, mode: "insensitive" } }
-        ]
-      },
+      where: { id: { in: await idsMatchingSearch("vouchers", q, { limit: 5, columns: ["voucherNumber", "serviceName", "confirmationCode"] }) } },
       take: 5,
       select: { id: true, voucherNumber: true, serviceName: true, confirmationCode: true }
     })
