@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getSystemConfig, syncExchangeRatesHandler, upsertSystemConfig } from "../controllers/system-config.controller";
+import { getAgencyInfoHandler, getSystemConfig, syncExchangeRatesHandler, upsertSystemConfig } from "../controllers/system-config.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { systemConfigUpsertSchema } from "../schemas/domain.schemas";
@@ -7,6 +7,10 @@ import { systemConfigUpsertSchema } from "../schemas/domain.schemas";
 import { requirePermission } from "../middlewares/permission.middleware";
 
 export const systemConfigRouter = Router();
+
+// Datos públicos de la agencia (encabezado de cotización y voucher): cualquier usuario autenticado,
+// porque quien genera documentos no tiene por qué administrar la configuración.
+systemConfigRouter.get("/agency", asyncHandler(getAgencyInfoHandler));
 
 // Cualquiera con acceso al panel de configuración (o para leer el nombre de agencia)
 systemConfigRouter.get("/", requirePermission("MANAGE_SYSTEM_CONFIG"), asyncHandler(getSystemConfig));
