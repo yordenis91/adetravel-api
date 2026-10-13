@@ -3,12 +3,13 @@ import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
 import { getPagination } from "../utils/pagination";
 import { ApiError } from "../utils/api-error";
+import { automaticEventsFilter } from "../services/activity-log.service";
 
 export async function listActivityLogs(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
-  const { entityType, entityId, action, search, performedBy, dateFrom, dateTo } = req.query as any;
+  const { entityType, entityId, action, search, performedBy, dateFrom, dateTo, includeAutomatic } = req.query as any;
 
-  const where: any = {};
+  const where: any = { ...automaticEventsFilter(includeAutomatic === "true") };
 
   if (entityType) where.entityType = entityType;
   if (entityId) where.entityId = entityId;
@@ -40,19 +41,20 @@ export async function listActivityLogs(req: Request, res: Response): Promise<voi
 
 export async function getActivityLogStats(req: Request, res: Response): Promise<void> {
   const days = Number(req.query.days) || 30;
+  const visible = automaticEventsFilter(req.query.includeAutomatic === "true");
   const now = new Date();
   const periodStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const total = await prisma.activityLog.count();
-  const today = await prisma.activityLog.count({ where: { createdAt: { gte: todayStart } } });
-  const recent = await prisma.activityLog.count({ where: { createdAt: { gte: periodStart } } });
+  const total = await prisma.activityLog.count({ where: visible });
+  const today = await prisma.activityLog.count({ where: { ...visible, createdAt: { gte: todayStart } } });
+  const recent = await prisma.activityLog.count({ where: { ...visible, createdAt: { gte: periodStart } } });
 
   // Agrupado por tipo de entidad
   const byEntityRaw = await prisma.activityLog.groupBy({
     by: ["entityType"],
     _count: { id: true },
-    where: { createdAt: { gte: periodStart } },
+    where: { ...visible, createdAt: { gte: periodStart } },
     orderBy: { _count: { id: "desc" } }
   });
   const byEntity = byEntityRaw.reduce((acc, curr) => ({ ...acc, [curr.entityType]: curr._count.id }), {});
@@ -61,7 +63,7 @@ export async function getActivityLogStats(req: Request, res: Response): Promise<
   const topActionsRaw = await prisma.activityLog.groupBy({
     by: ["action"],
     _count: { id: true },
-    where: { createdAt: { gte: periodStart } },
+    where: { ...visible, createdAt: { gte: periodStart } },
     orderBy: { _count: { id: "desc" } },
     take: 10
   });

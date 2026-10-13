@@ -6,12 +6,14 @@ export const listActivityLogSchema = z.object({
   action: z.string().optional(),
   search: z.string().optional(),
   performedBy: z.string().optional(),
+  includeAutomatic: z.enum(["true", "false"]).optional(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato inválido (YYYY-MM-DD)").optional(),
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato inválido (YYYY-MM-DD)").optional(),
 });
 
 export const statsActivityLogSchema = z.object({
   days: z.coerce.number().int().min(1).max(365).optional().default(30),
+  includeAutomatic: z.enum(["true", "false"]).optional(),
 });
 
 export const purgeActivityLogSchema = z.object({
