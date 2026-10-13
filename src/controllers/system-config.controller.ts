@@ -1,3 +1,4 @@
+import { getAgencyInfo } from "../services/agency.service";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem } from "../utils/response";
@@ -27,6 +28,10 @@ export function smtpPasswordUpdate(body: Record<string, unknown>): { set: boolea
   if (value === null) return { set: true, value: null };
   if (typeof value !== "string" || value === "") return { set: false };
   return { set: true, value: encryptPII(value) };
+}
+
+export async function getAgencyInfoHandler(_req: Request, res: Response): Promise<void> {
+  sendItem(res, await getAgencyInfo());
 }
 
 export async function getSystemConfig(_req: Request, res: Response): Promise<void> {
