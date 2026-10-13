@@ -29,3 +29,13 @@ export async function createActivityLog(input: ActivityLogInput): Promise<void> 
     logger.error({ err: error, action: input.action, entityId: input.entityId }, "[ActivityLogger] Error registrando actividad");
   }
 }
+
+/**
+ * Eventos automáticos: los que genera el propio sistema sin que nadie los haga (hoy, la sincronización
+ * programada de divisas: action SYNC_API sin `performedBy`). Se repiten varias veces al día y tapan la
+ * actividad real, así que la bitácora los oculta salvo que se pidan con includeAutomatic=true.
+ * La sincronización manual sí queda visible: la dispara una persona y lleva `performedBy`.
+ */
+export function automaticEventsFilter(includeAutomatic: boolean): Record<string, unknown> {
+  return includeAutomatic ? {} : { NOT: { action: "SYNC_API", performedBy: null } };
+}
