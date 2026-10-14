@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -29,12 +30,8 @@ export async function listVouchers(req: Request, res: Response): Promise<void> {
   if (req.query.search) {
     const search = req.query.search as string;
     where.OR = [
-      { voucherNumber: { contains: search, mode: "insensitive" } },
-      { serviceName: { contains: search, mode: "insensitive" } },
-      { destination: { contains: search, mode: "insensitive" } },
-      { confirmationCode: { contains: search, mode: "insensitive" } },
-      { client: { firstName: { contains: search, mode: "insensitive" } } },
-      { client: { lastName: { contains: search, mode: "insensitive" } } },
+      { id: { in: await idsMatchingSearch("vouchers", search) } },
+      { clientId: { in: await idsMatchingSearch("clients", search, { columns: ["firstName", "lastName"] }) } },
     ];
   }
 

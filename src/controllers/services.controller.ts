@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -24,8 +25,8 @@ export async function listServices(req: Request, res: Response): Promise<void> {
   if (req.query.search) {
     const search = req.query.search as string;
     where.OR = [
-      { serviceNumber: { contains: search, mode: "insensitive" } },
-      { request: { requestNumber: { contains: search, mode: "insensitive" } } },
+      { id: { in: await idsMatchingSearch("services", search) } },
+      { requestId: { in: await idsMatchingSearch("requests", search, { columns: ["requestNumber"] }) } },
     ];
   }
 

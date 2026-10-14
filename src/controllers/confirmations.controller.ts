@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -15,7 +16,7 @@ export async function listConfirmations(req: Request, res: Response): Promise<vo
     ...(req.query.requestId ? { requestId: req.query.requestId as string } : {}),
     ...(req.query.serviceId ? { serviceId: req.query.serviceId as string } : {}),
     ...(req.query.providerId ? { providerId: req.query.providerId as string } : {}),
-    ...(req.query.search ? { confirmationNumber: { contains: req.query.search as string, mode: "insensitive" as const } } : {})
+    ...(req.query.search ? { id: { in: await idsMatchingSearch("confirmations", req.query.search as string) } } : {})
   };
 
   const [data, total] = await Promise.all([

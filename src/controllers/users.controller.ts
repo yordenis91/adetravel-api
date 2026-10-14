@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcryptjs";
@@ -18,10 +19,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
   }
   
   if (search) {
-    where.OR = [
-      { fullName: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } }
-    ];
+    where.id = { in: await idsMatchingSearch("users", search) };
   }
 
   // Ejecución secuencial para evitar advertencias de concurrencia en pg

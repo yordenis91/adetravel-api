@@ -13,8 +13,15 @@ import { prisma } from "./prisma";
 // Tablas y columnas buscables. Lista cerrada: los nombres se interpolan en el SQL, nunca vienen del usuario.
 const SEARCHABLE = {
   clients: ["firstName", "lastName", "email", "phone", "rut"],
-  requests: ["requestNumber", "destinationCity", "originCity"],
+  requests: ["requestNumber", "destinationCity", "destinationCountry", "originCity"],
   vouchers: ["voucherNumber", "serviceName", "destination", "confirmationCode"],
+  users: ["fullName", "email"],
+  providers: ["name", "email"],
+  quotations: ["quotationNumber"],
+  payments: ["paymentNumber", "reference"],
+  services: ["serviceNumber"],
+  confirmations: ["confirmationNumber"],
+  activity_logs: ["description", "entityLabel", "action", "performedBy"],
 } as const;
 
 export type AccentSearchTable = keyof typeof SEARCHABLE;

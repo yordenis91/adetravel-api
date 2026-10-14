@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -15,10 +16,7 @@ export async function listProviders(req: Request, res: Response): Promise<void> 
   const where = {
     ...(search
       ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" as const } },
-            { email: { contains: search, mode: "insensitive" as const } }
-          ]
+          id: { in: await idsMatchingSearch("providers", search) }
         }
       : {}),
     ...(businessType ? { businessType } : {}),

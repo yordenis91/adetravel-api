@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -21,11 +22,7 @@ export async function listRequests(req: Request, res: Response): Promise<void> {
     ...(statuses.length ? { status: { in: statuses as never[] } } : {}),
     ...(clientId ? { clientId } : {}),
     ...(search ? {
-      OR: [
-        { requestNumber: { contains: search, mode: "insensitive" as const } },
-        { destinationCity: { contains: search, mode: "insensitive" as const } },
-        { destinationCountry: { contains: search, mode: "insensitive" as const } }
-      ]
+      id: { in: await idsMatchingSearch("requests", search, { columns: ["requestNumber", "destinationCity", "destinationCountry"] }) }
     } : {})
   };
 
