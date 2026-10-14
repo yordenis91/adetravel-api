@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -14,7 +15,7 @@ export async function listActivityLogs(req: Request, res: Response): Promise<voi
   if (entityType) where.entityType = entityType;
   if (entityId) where.entityId = entityId;
   if (action) where.action = action;
-  if (performedBy) where.performedBy = { contains: performedBy, mode: "insensitive" };
+  if (performedBy) where.id = { in: await idsMatchingSearch("activity_logs", performedBy, { columns: ["performedBy"], limit: 20000 }) };
 
   if (dateFrom || dateTo) {
     where.createdAt = {};
@@ -23,11 +24,8 @@ export async function listActivityLogs(req: Request, res: Response): Promise<voi
   }
 
   if (search) {
-    where.OR = [
-      { description: { contains: search, mode: "insensitive" } },
-      { entityLabel: { contains: search, mode: "insensitive" } },
-      { action: { contains: search, mode: "insensitive" } },
-    ];
+    const searchIds = await idsMatchingSearch("activity_logs", search, { columns: ["description", "entityLabel", "action"], limit: 20000 });
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), { id: { in: searchIds } }];
   }
 
   // Ejecución secuencial para evitar advertencias de conexión pg

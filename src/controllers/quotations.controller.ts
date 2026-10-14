@@ -1,3 +1,4 @@
+import { idsMatchingSearch } from "../lib/accent-search";
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { sendItem, sendList } from "../utils/response";
@@ -57,7 +58,7 @@ export async function listQuotations(req: Request, res: Response): Promise<void>
     ...(status ? { status: status as never } : {}),
     ...(req.query.clientId ? { clientId: req.query.clientId as string } : {}),
     ...(req.query.requestId ? { requestId: req.query.requestId as string } : {}),
-    ...(req.query.search ? { quotationNumber: { contains: req.query.search as string, mode: "insensitive" as const } } : {})
+    ...(req.query.search ? { id: { in: await idsMatchingSearch("quotations", req.query.search as string) } } : {})
   };
 
   const [data, total] = await Promise.all([

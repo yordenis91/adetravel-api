@@ -11,6 +11,9 @@ const mockResolveFullPayment = jest.fn();
 const mockEnv: Record<string, unknown> = {};
 
 jest.mock("../../../src/lib/prisma", () => ({ prisma: mockPrisma }));
+// La coincidencia sin tildes es SQL crudo (se prueba en accent-search.test.ts y en el e2e): aquí solo importa cómo se usa.
+const mockIds = jest.fn();
+jest.mock("../../../src/lib/accent-search", () => ({ idsMatchingSearch: (...args: unknown[]) => mockIds(...args) }));
 jest.mock("../../../src/services/activity-log.service", () => ({
   createActivityLog: mockCreateActivityLog,
 }));
@@ -74,20 +77,18 @@ describe("payments.controller", () => {
       expect(args.where).toMatchObject({ status: "PENDIENTE", clientId: "c1", requestId: "r1" });
     });
 
-    it("arma un OR de búsqueda por texto (paymentNumber, referencia, nombre/apellido del cliente)", async () => {
+    it("busca por texto ignorando tildes: pagos por número/referencia o clientes por nombre/apellido", async () => {
       mockPrisma.payment.findMany.mockResolvedValue([]);
       mockPrisma.payment.count.mockResolvedValue(0);
+      mockIds.mockImplementation(async (table: string) => (table === "payments" ? ["p1"] : ["c1"]));
       const req = buildReq({ query: { search: "Ana" } as any });
 
       await listPayments(req, createMockRes());
 
+      expect(mockIds).toHaveBeenCalledWith("payments", "Ana");
+      expect(mockIds).toHaveBeenCalledWith("clients", "Ana", { columns: ["firstName", "lastName"] });
       const args = mockPrisma.payment.findMany.mock.calls[0][0];
-      expect(args.where.OR).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ paymentNumber: expect.anything() }),
-          expect.objectContaining({ client: { firstName: expect.anything() } }),
-        ])
-      );
+      expect(args.where.OR).toEqual([{ id: { in: ["p1"] } }, { clientId: { in: ["c1"] } }]);
     });
 
     it("devuelve la lista paginada usando sendList", async () => {
