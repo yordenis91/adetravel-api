@@ -17,17 +17,20 @@ const { env } = require("../src/config/env");
 const { prisma } = require("../src/lib/prisma");
 
 const tag = `um${process.pid}${Date.now()}`;
+
+type TestUser = { id: string; email: string; fullName: string; role: string; tokenVersion?: number };
+type Row = { id: string; status?: string; assigneeName?: string | null; createdByName?: string | null };
 const PASSWORD = "Inicial-2026!";
 
 describe("gestión de usuarios (integración con Postgres)", () => {
-  const u: Record<string, any> = {};
+  const u: Record<string, TestUser> = {};
 
   const mk = async (key: string, data: Record<string, unknown> = {}) => {
     u[key] = await prisma.user.create({
       data: { email: `${tag}-${key}@example.com`, fullName: `Gestión ${key}`, passwordHash: await bcrypt.hash(PASSWORD, 4), role: "USUARIO", ...data },
     });
   };
-  const as = (user: any) => ({
+  const as = (user: TestUser) => ({
     Authorization: `Bearer ${jwt.sign({ id: user.id, email: user.email, role: user.role, tv: user.tokenVersion ?? 0 }, env.JWT_SECRET)}`,
   });
 
@@ -40,7 +43,7 @@ describe("gestión de usuarios (integración con Postgres)", () => {
   });
 
   afterAll(async () => {
-    await prisma.activityLog.deleteMany({ where: { entityId: { in: Object.values(u).map((x: any) => x.id) } } });
+    await prisma.activityLog.deleteMany({ where: { entityId: { in: Object.values(u).map((x: TestUser) => x.id) } } });
     await prisma.user.deleteMany({ where: { email: { startsWith: `${tag}-` } } });
     await prisma.$disconnect();
   });
@@ -74,11 +77,11 @@ describe("gestión de usuarios (integración con Postgres)", () => {
 
     it("filtra por rol de agencia y por estado", async () => {
       const byRole = await request(app).get(`/api/users?search=${tag}&agencyRole=OPERACIONES`).set(as(u.admin));
-      expect(byRole.body.data.map((x: any) => x.id)).toEqual([u.target.id]);
+      expect(byRole.body.data.map((x: Row) => x.id)).toEqual([u.target.id]);
 
       await prisma.user.update({ where: { id: u.other.id }, data: { isActive: false } });
       const inactive = await request(app).get(`/api/users?search=${tag}&isActive=false`).set(as(u.admin));
-      expect(inactive.body.data.map((x: any) => x.id)).toEqual([u.other.id]);
+      expect(inactive.body.data.map((x: Row) => x.id)).toEqual([u.other.id]);
       await prisma.user.update({ where: { id: u.other.id }, data: { isActive: true } });
     });
 

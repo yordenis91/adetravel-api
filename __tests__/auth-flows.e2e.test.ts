@@ -18,11 +18,13 @@ const { env } = require("../src/config/env");
 const { prisma } = require("../src/lib/prisma");
 
 const tag = `af${process.pid}${Date.now()}`;
+
+type TestUser = { id: string; email: string; fullName: string; role: string; tokenVersion?: number };
 const PASSWORD = "Inicial-2026!";
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 
 describe("autenticación (integración con Postgres)", () => {
-  const users: Record<string, any> = {};
+  const users: Record<string, TestUser> = {};
   const createdEmails: string[] = [];
 
   const mkUser = async (key: string, data: Record<string, unknown> = {}) => {
@@ -32,7 +34,7 @@ describe("autenticación (integración con Postgres)", () => {
     });
     return users[key];
   };
-  const tokenOf = (u: any, extra: Record<string, unknown> = {}, options: jwt.SignOptions = {}) =>
+  const tokenOf = (u: TestUser, extra: Record<string, unknown> = {}, options: jwt.SignOptions = {}) =>
     jwt.sign({ id: u.id, email: u.email, role: u.role, tv: u.tokenVersion ?? 0, ...extra }, env.JWT_SECRET, options);
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
   const login = (email: string, password: string) => request(app).post("/api/auth/login").send({ email, password });

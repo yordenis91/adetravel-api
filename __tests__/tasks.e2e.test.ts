@@ -17,8 +17,11 @@ const { prisma } = require("../src/lib/prisma");
 
 const tag = `tk${process.pid}${Date.now()}`;
 
+type TestUser = { id: string; email: string; fullName: string; role: string; tokenVersion?: number };
+type Row = { id: string; status?: string; assigneeName?: string | null; createdByName?: string | null };
+
 describe("tareas (integración con Postgres)", () => {
-  const u: Record<string, any> = {};
+  const u: Record<string, TestUser> = {};
   const taskIds: string[] = [];
 
   const mk = async (key: string, data: Record<string, unknown> = {}) => {
@@ -26,7 +29,7 @@ describe("tareas (integración con Postgres)", () => {
       data: { email: `${tag}-${key}@example.com`, fullName: `Tareas ${key}`, passwordHash: await bcrypt.hash("Inicial-2026!", 4), role: "USUARIO", ...data },
     });
   };
-  const as = (user: any) => ({
+  const as = (user: TestUser) => ({
     Authorization: `Bearer ${jwt.sign({ id: user.id, email: user.email, role: user.role, tv: 0 }, env.JWT_SECRET)}`,
   });
   const body = (extra: Record<string, unknown> = {}) => ({
@@ -35,7 +38,7 @@ describe("tareas (integración con Postgres)", () => {
     priority: "MEDIA",
     ...extra,
   });
-  const create = async (user: any, extra: Record<string, unknown> = {}) => {
+  const create = async (user: TestUser, extra: Record<string, unknown> = {}) => {
     const res = await request(app).post("/api/tasks").set(as(user)).send(body(extra));
     if (res.body?.data?.id) taskIds.push(res.body.data.id);
     return res;
@@ -49,7 +52,7 @@ describe("tareas (integración con Postgres)", () => {
   });
 
   afterAll(async () => {
-    const userIds = Object.values(u).map((x: any) => x.id);
+    const userIds = Object.values(u).map((x: TestUser) => x.id);
     await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.activityLog.deleteMany({ where: { entityId: { in: taskIds } } });
     await prisma.task.deleteMany({ where: { userId: { in: userIds } } });
@@ -83,7 +86,7 @@ describe("tareas (integración con Postgres)", () => {
   });
 
   describe("delegación", () => {
-    let delegated: any;
+    let delegated: Row;
 
     it("asigna a otro usuario, le notifica y queda en la bitácora", async () => {
       const res = await create(u.ana, { assigneeId: u.beto.id });
@@ -108,20 +111,20 @@ describe("tareas (integración con Postgres)", () => {
 
     it("el asignado la ve en «mis tareas» y quien la creó, en «delegadas»", async () => {
       const mine = await request(app).get("/api/tasks").set(as(u.beto));
-      expect(mine.body.data.map((t: any) => t.id)).toContain(delegated.id);
+      expect(mine.body.data.map((t: Row) => t.id)).toContain(delegated.id);
       const del = await request(app).get("/api/tasks?scope=delegated").set(as(u.ana));
-      const found = del.body.data.find((t: any) => t.id === delegated.id);
+      const found = del.body.data.find((t: Row) => t.id === delegated.id);
       expect(found).toBeDefined();
       expect(found.assigneeName).toBe(u.beto.fullName);
       expect(found.createdByName).toBe(u.ana.fullName);
       // Y no aparece entre las propias de quien la delegó.
       const anaMine = await request(app).get("/api/tasks").set(as(u.ana));
-      expect(anaMine.body.data.map((t: any) => t.id)).not.toContain(delegated.id);
+      expect(anaMine.body.data.map((t: Row) => t.id)).not.toContain(delegated.id);
     });
 
     it("un tercero no la ve, no la edita y no la borra", async () => {
       const list = await request(app).get("/api/tasks").set(as(u.carla));
-      expect(list.body.data.map((t: any) => t.id)).not.toContain(delegated.id);
+      expect(list.body.data.map((t: Row) => t.id)).not.toContain(delegated.id);
       expect((await request(app).patch(`/api/tasks/${delegated.id}`).set(as(u.carla)).send({ status: "COMPLETADA" })).status).toBe(404);
       expect((await request(app).delete(`/api/tasks/${delegated.id}`).set(as(u.carla))).status).toBe(404);
     });
@@ -152,9 +155,9 @@ describe("tareas (integración con Postgres)", () => {
     it("filtra por estado y por entidad relacionada", async () => {
       const related = await create(u.carla, { relatedEntityType: "REQUEST", relatedEntityId: `rel-${tag}` });
       const done = await request(app).get("/api/tasks?status=COMPLETADA").set(as(u.beto));
-      expect(done.body.data.every((t: any) => t.status === "COMPLETADA")).toBe(true);
+      expect(done.body.data.every((t: Row) => t.status === "COMPLETADA")).toBe(true);
       const byEntity = await request(app).get(`/api/tasks?relatedEntityId=rel-${tag}&relatedEntityType=REQUEST`).set(as(u.carla));
-      expect(byEntity.body.data.map((t: any) => t.id)).toEqual([related.body.data.id]);
+      expect(byEntity.body.data.map((t: Row) => t.id)).toEqual([related.body.data.id]);
     });
 
     it("pagina el listado", async () => {
