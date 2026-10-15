@@ -30,7 +30,9 @@ Método: se midió sobre todo `src/` (se excluyeron `src/ops/` y `src/server.ts`
 | Cliente, `src/` completo (sin `components/ui`) | 26,6 % | 26,3 % | 26,1 % | 26,6 % |
 | Cliente, lo que mide el CI hoy (5 archivos) | 69,2 % | 64,1 % | 61,6 % | 69,8 % |
 
-**Hallazgo:** el CI mide solo 17 archivos del API y 5 del cliente, elegidos a mano (`jest.config.js`, `vite.config.ts`), con umbrales que se cumplen sobre ese subconjunto. Es una decisión explícita y comentada en el código, pero el número que muestra el CI **no representa** el sistema. En el cliente la diferencia es grande: 69 % mostrado frente a 27 % real.
+**Hallazgo (corregido el 15 de octubre de 2026, fase 2):** el CI medía solo 17 archivos del API y 5 del cliente, elegidos a mano (`jest.config.js`, `vite.config.ts`), con umbrales que se cumplían sobre ese subconjunto, así que el número **no representaba** el sistema. En el cliente la diferencia era grande: 69 % mostrado frente a 27 % real.
+
+**Cómo queda:** ambos repos miden ahora todo `src/` (el API excluye `src/ops` y `server.ts`; el cliente excluye `components/ui`, los tests y los tipos). El resumen de cada ejecución del CI muestra la cobertura. Una corrida única del API (71 suites, 486 pruebas) da 77,4 % de sentencias, 63,7 % de ramas, 68,8 % de funciones y 79,3 % de líneas; el cliente, 26,7 / 26,4 / 26,2 / 26,7 %. Umbrales: API 75 / 62 / 66 / 77 y cliente 25 / 25 / 25 / 25, un poco por debajo de lo medido, y solo se suben.
 
 Archivos grandes del API con menos cobertura (cobertura combinada): tareas 11 %, plantillas de correo 30 %, usuarios 36 %, autenticación 48 %, solicitudes 57 %, `jobs/index` 63 %, middleware de autenticación 65 %.
 
@@ -83,7 +85,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | Fase | Trabajo | Cubre | Estado |
 |---|---|---|---|
 | 1 | Documento de arquitectura y ADR | Documentación | **Hecho** (este conjunto de documentos) |
-| 2 | Cobertura honesta: medir todo `src/` en el CI, publicar el número real y fijar umbrales que no bajen | H1, H2 | Pendiente |
+| 2 | Cobertura honesta: medir todo `src/` en el CI, publicar el número real y fijar umbrales que no bajen | H1, H2 | **Hecho** el 15 de octubre de 2026 (ver 2.2) |
 | 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | Pendiente |
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | Pendiente (requiere decidir el flujo de PR) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | Pendiente |

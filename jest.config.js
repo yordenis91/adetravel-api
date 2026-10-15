@@ -4,35 +4,25 @@ module.exports = {
   testTimeout: 30000,
   testMatch: ['**/__tests__/**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  // La cobertura se mide solo sobre los módulos con tests unitarios reales
-  // (pagos, PII de clientes, validadores/schemas compartidos, manejo de
-  // errores). El resto del backend aún no tiene suite y diluiría el número
-  // sin decir nada útil; se irá ampliando módulo por módulo.
+  // Se mide TODO src/ (unitarias + e2e juntas), no solo los módulos con suite propia: el número
+  // tiene que decir cuánto del sistema está probado de verdad. Quedan fuera los scripts operativos
+  // (src/ops, que se ejecutan a mano), el arranque del proceso (server.ts) y los tipos.
   collectCoverageFrom: [
-    'src/controllers/payments.controller.ts',
-    'src/controllers/clients.controller.ts',
-    'src/controllers/permissions.controller.ts',
-    'src/config/permissions.ts',
-    'src/validators/permissions.validator.ts',
-    'src/validators/payments.validator.ts',
-    'src/validators/clients.validator.ts',
-    'src/validators/users.validator.ts',
-    'src/validators/catalog.validator.ts',
-    'src/schemas/auth.schemas.ts',
-    'src/utils/response.ts',
-    'src/utils/api-error.ts',
-    'src/middlewares/validation.middleware.ts',
-    'src/middlewares/error-handler.middleware.ts',
-    'src/lib/pii-encryption.ts',
-    'src/lib/client-pii-extension.ts',
-    'src/jobs/backupDatabase.job.ts'
+    'src/**/*.ts',
+    'src/**/*.tsx',
+    '!src/**/*.d.ts',
+    '!src/ops/**',
+    '!src/server.ts'
   ],
+  coverageReporters: ['text-summary', 'json-summary', 'lcov'],
   coverageThreshold: {
     global: {
-      statements: 80,
-      branches: 70,
-      functions: 80,
-      lines: 80
+      // Un poco por debajo de lo medido el 15 de octubre de 2026 (77,8 / 64,9 / 69,4 / 79,8)
+      // para que una variación mínima no rompa el CI. Solo se sube, nunca se baja.
+      statements: 75,
+      branches: 62,
+      functions: 66,
+      lines: 77
     }
   }
 };
