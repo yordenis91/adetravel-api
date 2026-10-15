@@ -82,5 +82,9 @@ jobs:
       # GitHub Secret, no en texto plano (ver README del repo / PR de rotación).
       - name: 🚀 Notificar a EasyPanel (despliegue Backend)
         if: github.event_name == 'push' && success()
+        # Reintenta si el panel está reiniciándose o tarda en responder (GitHub no puede conectar
+        # a veces justo después de otro despliegue). --fail hace visible un error HTTP del panel.
         run: |
-          curl -X POST "${{ secrets.EASYPANEL_BACKEND_DEPLOY_HOOK }}"
+          curl --fail --silent --show-error --max-time 30 \
+            --retry 5 --retry-delay 15 --retry-connrefused --retry-all-errors \
+            -X POST "${{ secrets.EASYPANEL_BACKEND_DEPLOY_HOOK }}"

@@ -6,6 +6,15 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    ignore:
+      # Saltos mayores que hoy no se pueden aplicar (ver docs/CALIDAD.md, "Migraciones pendientes").
+      # Las versiones menores y los parches de estos paquetes siguen llegando.
+      - dependency-name: "typescript"       # ts-jest solo admite TypeScript < 7
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@sentry/node"     # Sentry 11 elimina sendDefaultPii: requiere revisión de privacidad
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotenv"           # dotenv 18 exige moduleResolution con soporte de "exports"
+        update-types: ["version-update:semver-major"]
     groups:
       # ESLint y sus complementos se actualizan siempre juntos: @eslint/js 10 exige eslint 10, y
       # subir solo uno rompe `npm ci` (ERESOLVE).
