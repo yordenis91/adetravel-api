@@ -3,6 +3,13 @@ module.exports = {
   testEnvironment: 'node',
   testTimeout: 30000,
   testMatch: ['**/__tests__/**/*.test.ts'],
+  // sanitize-html >= 2.17.7 (corrige vulnerabilidades) depende de htmlparser2 12, que es solo ESM.
+  // En producción Node lo carga con require() sin problema; Jest no, así que se transforma.
+  transform: {
+    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.m?js$': ['ts-jest', { tsconfig: { allowJs: true, module: 'commonjs', esModuleInterop: true }, diagnostics: false }]
+  },
+  transformIgnorePatterns: ['/node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)/)'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   // Se mide TODO src/ (unitarias + e2e juntas), no solo los módulos con suite propia: el número
   // tiene que decir cuánto del sistema está probado de verdad. Quedan fuera los scripts operativos

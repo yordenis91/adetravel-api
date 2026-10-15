@@ -66,9 +66,9 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H1 | Cobertura del CI no representativa | Alta | Ver 2.2. Un revisor la detecta al abrir la configuración. |
 | H2 | Cobertura baja en el cliente | Alta | 27 % real. |
 | H3 | `main` sin protección de rama en ambos repos | Alta | Se puede subir código sin pasar por el CI. El despliegue sí exige CI verde, pero el código ya está en `main`. |
-| H4 | El CI no ejecuta lint ni comprobación de tipos del cliente | Media | `vite build` no comprueba tipos. El cliente tiene 457 avisos de ESLint (420 son `no-explicit-any`), mantenidos sin subir. |
-| H5 | El API no tiene ESLint | Media | No hay configuración de lint. |
-| H6 | Sin `npm audit` ni Dependabot | Media | 1 vulnerabilidad moderada en producción (`sanitize-html`). |
+| H4 | ~~El CI no ejecuta lint ni comprobación de tipos del cliente~~ Corregido en la fase 3 | Media | `vite build` no comprueba tipos. El cliente tiene 457 avisos de ESLint (420 son `no-explicit-any`), mantenidos sin subir. |
+| H5 | ~~El API no tiene ESLint~~ Corregido en la fase 3 | Media | Ahora hay ESLint con línea base de avisos. |
+| H6 | ~~Sin `npm audit` ni Dependabot~~ Corregido en la fase 3 | Media | `sanitize-html` actualizado; auditoría y Dependabot en ambos repos. |
 | H7 | Importes como `Float` | Media | ADR 008. |
 | H8 | Cobertura baja en autenticación, usuarios y tareas | Media | Autenticación es la más sensible. |
 | H9 | Sin pruebas de contrato entre API y cliente | Media | Un cambio en una respuesta del API puede romper el cliente sin que ningún test lo avise. |
@@ -76,6 +76,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H11 | Dos mecanismos de respaldo | Baja | ADR 012: decidir cuál es el oficial. |
 | H12 | Numeración sin prueba de concurrencia | Baja | ADR 009. |
 | H13 | CI en Postgres 16, producción en 17 | Baja | Alinear. |
+| H15 | Tipado poco estricto en el cliente | Media | `tsconfig.app.json` del cliente tiene `strictNullChecks`, `noImplicitAny` y `noUnusedLocals` desactivados (el API sí usa `strict`). `tsc` pasa, pero comprueba menos de lo que parece. Activar el modo estricto por pasos es trabajo propio. |
 | H14 | Documentos sueltos y antiguos en la raíz de los repos | Baja | Varios `.md` de trabajo (`IMPLEMENTATION_SUMMARY.md`, `EXAMPLES_AND_SCENARIOS.md`, `verify-implementation.sh`, `Notas.txt`, `.docx`) sin dueño claro; conviene ordenarlos o archivarlos. |
 
 ## 4. Plan de trabajo
@@ -86,7 +87,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 |---|---|---|---|
 | 1 | Documento de arquitectura y ADR | Documentación | **Hecho** (este conjunto de documentos) |
 | 2 | Cobertura honesta: medir todo `src/` en el CI, publicar el número real y fijar umbrales que no bajen | H1, H2 | **Hecho** el 15 de octubre de 2026 (ver 2.2) |
-| 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | Pendiente |
+| 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | **Hecho** el 15 de octubre de 2026 (ver 4.1) |
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | Pendiente (requiere decidir el flujo de PR) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | Pendiente |
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
@@ -95,6 +96,23 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | Pendiente |
 
 Criterio de «terminado» para decir «calidad demostrable»: fases 2 a 4 y 7 completas, con la cobertura real publicada en cada ejecución del CI y la protección de rama activa.
+
+### 4.1 Qué quedó de la fase 3
+
+| Puerta | API | Cliente |
+|---|---|---|
+| Tipos | `npm run build` (`tsc` con `strict`) ya estaba | Nuevo: `npm run typecheck` en el CI |
+| Lint | Nuevo: ESLint (typescript-eslint). 0 errores, 261 avisos de línea base | Ya existía; ahora en el CI. 0 errores, 457 avisos de línea base |
+| Candado de lint | `npm run lint:ci` falla si hay más de 261 avisos | `npm run lint:ci` falla si hay más de 457 avisos |
+| Auditoría | `npm audit --omit=dev --audit-level=high`: 0 vulnerabilidades | Igual; 2 moderadas conocidas (`uuid` vía `exceljs`) |
+| Dependabot | Semanal, agrupa menores y parches; Actions mensual | Igual |
+| Node en CI | Subido de 20 a 22, como el `Dockerfile` y `.nvmrc` | Sin cambio |
+
+Detalles que conviene saber:
+
+- **Los avisos heredados son sobre todo `any`** (245 en el API, 420 en el cliente). `no-explicit-any` pasó de error a aviso y el candado impide que aumenten; el trabajo es bajar el número.
+- **`sanitize-html` 2.13.1 → 2.18.1** corrige las 3 vulnerabilidades moderadas conocidas (esquemas `javascript:` y XSS por SVG). Las versiones corregidas exigen `htmlparser2` 12, que es solo ESM: Node 22 lo carga sin problema (comprobado con el código compilado, que elimina `<script>`, `onclick` y enlaces `javascript:`), pero Jest necesitó una transformación para esos paquetes (`jest.config.js`).
+- **Vulnerabilidades moderadas del cliente:** `uuid` llega por `exceljs`; la única corrección que ofrece npm es retroceder `exceljs` a la versión 3.4, que no tiene sentido. Se revisan con Dependabot y no bloquean el CI.
 
 ## 5. Cómo reproducir las mediciones
 

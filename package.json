@@ -22,6 +22,9 @@
     "pii:encrypt-services-backfill": "node dist/ops/encrypt-existing-service-pii.js",
     "pii:rotate-key": "ts-node prisma/scripts/rotate-pii-key.ts",
     "smtp:encrypt-password": "ts-node prisma/scripts/encrypt-smtp-password.ts",
+    "lint": "eslint .",
+    "lint:ci": "eslint . --max-warnings 261",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest --passWithNoTests",
     "test:e2e": "bash scripts/test-e2e.sh",
     "restore:drill": "bash scripts/restore-drill.sh"
@@ -60,6 +63,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
@@ -70,11 +74,14 @@
     "@types/react": "^18.3.12",
     "@types/sanitize-html": "^2.16.2",
     "@types/supertest": "^6.0.3",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
     "jest": "^30.2.0",
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2"
   },
   "overrides": {
     "mysql2": "^3.24.5",
