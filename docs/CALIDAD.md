@@ -70,13 +70,15 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H5 | ~~El API no tiene ESLint~~ Corregido en la fase 3 | Media | Ahora hay ESLint con línea base de avisos. |
 | H6 | ~~Sin `npm audit` ni Dependabot~~ Corregido en la fase 3 | Media | `sanitize-html` actualizado; auditoría y Dependabot en ambos repos. |
 | H7 | Importes como `Float` | Media | ADR 008. |
-| H8 | Cobertura baja en autenticación, usuarios y tareas | Media | Autenticación es la más sensible. |
+| H8 | ~~Cobertura baja en autenticación, usuarios y tareas~~ Corregido en la fase 5 | Media | Autenticación 80 %, usuarios y tareas 100 %. Plantillas de correo (30 %) y permisos (71 %) siguen bajos. |
 | H9 | Sin pruebas de contrato entre API y cliente | Media | Un cambio en una respuesta del API puede romper el cliente sin que ningún test lo avise. |
 | H10 | Monitoreo externo y `SENTRY_DSN` sin verificar | Media | Ver 2.4. |
 | H11 | Dos mecanismos de respaldo | Baja | ADR 012: decidir cuál es el oficial. |
 | H12 | Numeración sin prueba de concurrencia | Baja | ADR 009. |
 | H13 | CI en Postgres 16, producción en 17 | Baja | Alinear. |
 | H15 | Tipado poco estricto en el cliente | Media | `tsconfig.app.json` del cliente tiene `strictNullChecks`, `noImplicitAny` y `noUnusedLocals` desactivados (el API sí usa `strict`). `tsc` pasa, pero comprueba menos de lo que parece. Activar el modo estricto por pasos es trabajo propio. |
+| H16 | Un administrador que restablece la contraseña de otro usuario no cierra sus sesiones abiertas | Media | Comprobado con una prueba desechable: tras `PATCH /api/users/:id` con `password`, la sesión anterior del usuario sigue devolviendo 200. El cambio desde el perfil y el restablecimiento por correo sí las cierran. Arreglo de una línea (incrementar `tokenVersion`), pendiente de decisión. |
+| H17 | Esquema de validación duplicado y sin uso | Baja | `src/schemas/users.schemas.ts` define otro `updateUserSchema`; las rutas usan `src/validators/users.validator.ts`. El primero induce a error. |
 | H14 | Documentos sueltos y antiguos en la raíz de los repos | Baja | Varios `.md` de trabajo (`IMPLEMENTATION_SUMMARY.md`, `EXAMPLES_AND_SCENARIOS.md`, `verify-implementation.sh`, `Notas.txt`, `.docx`) sin dueño claro; conviene ordenarlos o archivarlos. |
 
 ## 4. Plan de trabajo
@@ -89,7 +91,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 2 | Cobertura honesta: medir todo `src/` en el CI, publicar el número real y fijar umbrales que no bajen | H1, H2 | **Hecho** el 15 de octubre de 2026 (ver 2.2) |
 | 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | **Hecho** el 15 de octubre de 2026 (ver 4.1) |
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | Pendiente (requiere decidir el flujo de PR) |
-| 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | Pendiente |
+| 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
 | 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | Pendiente |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
@@ -113,6 +115,18 @@ Detalles que conviene saber:
 - **Los avisos heredados son sobre todo `any`** (245 en el API, 420 en el cliente). `no-explicit-any` pasó de error a aviso y el candado impide que aumenten; el trabajo es bajar el número.
 - **`sanitize-html` 2.13.1 → 2.18.1** corrige las 3 vulnerabilidades moderadas conocidas (esquemas `javascript:` y XSS por SVG). Las versiones corregidas exigen `htmlparser2` 12, que es solo ESM: Node 22 lo carga sin problema (comprobado con el código compilado, que elimina `<script>`, `onclick` y enlaces `javascript:`), pero Jest necesitó una transformación para esos paquetes (`jest.config.js`).
 - **Vulnerabilidades moderadas del cliente:** `uuid` llega por `exceljs`; la única corrección que ofrece npm es retroceder `exceljs` a la versión 3.4, que no tiene sentido. Se revisan con Dependabot y no bloquean el CI.
+
+### 4.2 Qué quedó de la fase 5
+
+Tres suites e2e nuevas contra Postgres real (59 pruebas): `auth-flows`, `users-management` y `tasks`.
+
+- **Autenticación:** inicio de sesión (mismo error para correo inexistente y contraseña errónea, cuenta desactivada), `/me`, token ausente, mal firmado y caducado, cambio de contraseña desde el perfil (invalida la sesión anterior y entrega un token nuevo), invitación (permiso, correo normalizado, enlace de 7 días, duplicados), recuperación de contraseña (sin enumeración de usuarios, enlace de 1 hora, de un solo uso, cierra sesiones) y cierre de sesión.
+- **Usuarios:** permisos por endpoint, listado con filtros, protecciones contra cambiarse el propio rol, desactivarse o borrarse, que no se pueda colar `passwordHash` ni `tokenVersion`, cambio de correo y de contraseña por el administrador, y que desactivar a alguien le corte el acceso.
+- **Tareas:** propias y delegadas, reasignación, notificaciones, bitácora, filtros y borrado, y que un tercero no vea ni modifique tareas ajenas.
+
+Cobertura de todo `src/` tras la fase (corrida única, 545 pruebas): 82,4 % de sentencias, 69,6 % de ramas, 73,8 % de funciones y 84,3 % de líneas (antes 77,4 / 63,7 / 68,8 / 79,3). Autenticación pasó de 48 % a 80 %, el middleware de autenticación de 65 % a 83 %, usuarios de 36 % a 100 % y tareas de 11 % a 100 %. Umbrales nuevos: 80 / 67 / 71 / 82.
+
+Nota sobre la medición: en esa corrida el servidor estaba saturado (carga de unos 200 por otros despliegues del VPS) y 2 pruebas antiguas agotaron su tiempo; las cifras podrían ser algo mayores. Con la carga normal pasan las 30 suites e2e (212 pruebas) y las 44 unitarias (333).
 
 ## 5. Cómo reproducir las mediciones
 
