@@ -88,6 +88,9 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
   if (updates.password) {
     updates.passwordHash = await bcrypt.hash(updates.password, 12);
     delete updates.password; // Borramos el texto plano para que Prisma no dé error
+    // Igual que el cambio desde el perfil y el restablecimiento por correo: las sesiones abiertas con
+    // la contraseña anterior dejan de valer (un administrador suele restablecerla por sospecha de acceso ajeno).
+    updates.tokenVersion = { increment: 1 };
   }
   
   // Actualización limpia en Prisma
