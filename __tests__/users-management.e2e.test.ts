@@ -153,8 +153,13 @@ describe("gestión de usuarios (integración con Postgres)", () => {
 
     it("el administrador restablece la contraseña de otro usuario: se guarda cifrada y sirve para entrar", async () => {
       const NEW = "Reasignada-2026!";
+      const session = as(u.target); // sesión abierta con la contraseña anterior
+      expect((await request(app).get("/api/auth/me").set(session)).status).toBe(200);
       const res = await request(app).patch(`/api/users/${u.target.id}`).set(as(u.admin)).send({ password: NEW });
       expect(res.status).toBe(200);
+      const closed = await request(app).get("/api/auth/me").set(session);
+      expect(closed.status).toBe(401);
+      expect(closed.body.code).toBe("TOKEN_REVOKED");
       const stored = await prisma.user.findUnique({ where: { id: u.target.id } });
       expect(stored.passwordHash).not.toBe(NEW);
       const email = stored.email;
