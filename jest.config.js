@@ -24,12 +24,13 @@ module.exports = {
   coverageReporters: ['text-summary', 'json-summary', 'lcov'],
   coverageThreshold: {
     global: {
-      // Un poco por debajo de lo medido el 15 de octubre de 2026 (77,8 / 64,9 / 69,4 / 79,8)
-      // para que una variación mínima no rompa el CI. Solo se sube, nunca se baja.
-      statements: 75,
-      branches: 62,
-      functions: 66,
-      lines: 77
+      // Un poco por debajo de lo medido el 15 de octubre de 2026 tras la fase 5
+      // (82,4 / 69,6 / 73,8 / 84,3) para que una variación mínima no rompa el CI.
+      // Solo se sube, nunca se baja.
+      statements: 80,
+      branches: 67,
+      functions: 71,
+      lines: 82
     }
   }
 };
