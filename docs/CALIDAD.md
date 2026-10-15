@@ -65,7 +65,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 |---|---|---|---|
 | H1 | Cobertura del CI no representativa | Alta | Ver 2.2. Un revisor la detecta al abrir la configuración. |
 | H2 | Cobertura baja en el cliente | Alta | 27 % real. |
-| H3 | `main` sin protección de rama en ambos repos | Alta | Se puede subir código sin pasar por el CI. El despliegue sí exige CI verde, pero el código ya está en `main`. |
+| H3 | ~~`main` sin protección de rama en ambos repos~~ Corregido en la fase 4 | Alta | Se puede subir código sin pasar por el CI. El despliegue sí exige CI verde, pero el código ya está en `main`. |
 | H4 | ~~El CI no ejecuta lint ni comprobación de tipos del cliente~~ Corregido en la fase 3 | Media | `vite build` no comprueba tipos. El cliente tiene 457 avisos de ESLint (420 son `no-explicit-any`), mantenidos sin subir. |
 | H5 | ~~El API no tiene ESLint~~ Corregido en la fase 3 | Media | Ahora hay ESLint con línea base de avisos. |
 | H6 | ~~Sin `npm audit` ni Dependabot~~ Corregido en la fase 3 | Media | `sanitize-html` actualizado; auditoría y Dependabot en ambos repos. |
@@ -90,7 +90,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 1 | Documento de arquitectura y ADR | Documentación | **Hecho** (este conjunto de documentos) |
 | 2 | Cobertura honesta: medir todo `src/` en el CI, publicar el número real y fijar umbrales que no bajen | H1, H2 | **Hecho** el 15 de octubre de 2026 (ver 2.2) |
 | 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | **Hecho** el 15 de octubre de 2026 (ver 4.1) |
-| 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | Pendiente (requiere decidir el flujo de PR) |
+| 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | **Hecho** el 15 de octubre de 2026 (ver 4.4) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
 | 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | Pendiente |
@@ -137,6 +137,23 @@ Dependabot propuso estos saltos el 15 de octubre de 2026 y se cerraron porque ho
 | `@sentry/node` | 10 → 11 | La opción `sendDefaultPii` ya no existe; la compilación falla. Esa opción evita enviar IP, cookies y cuerpos de las peticiones. | Leer la guía de migración, localizar el equivalente y comprobar con una prueba que no se envían datos personales, antes de subir. |
 | `typescript` | 6 → 7 | `ts-jest` declara `typescript >=4.3 <7`; `npm ci` falla con `ERESOLVE`. | Esperar a que `ts-jest` soporte TypeScript 7. |
 | `dotenv` | 17 → 18 | Publica sus tipos solo por `exports`; `tsconfig.json` usa `moduleResolution: node`, que lo ignora (`TS2882`). | Cambiar la resolución de módulos (por ejemplo a `node16`), con el resto de ajustes que eso implica. |
+
+### 4.4 Protección de `main` (fase 4)
+
+Aplicada el 15 de octubre de 2026 en `adetravel-api` y `adetravel-client`:
+
+| Regla | Valor |
+|---|---|
+| Pull request obligatorio | Sí. No se puede subir directo a `main`. |
+| Comprobación obligatoria | `Inspector de Backend` (API) / `Inspector de Frontend` (cliente): el CI de la rama debe pasar. |
+| Aprobaciones requeridas | 0. El equipo es una persona y GitHub no permite aprobar el propio PR; el control es el CI. Subir a 1 cuando haya una segunda persona. |
+| Aplica a administradores | Sí. Para una urgencia se desactiva un momento en Settings → Branches. |
+| Rama al día con `main` antes de fusionar | No. Menos fricción con los PR de Dependabot; los conflictos reales siguen impidiendo fusionar. |
+| Force-push y borrado de `main` | Prohibidos. |
+
+Efecto sobre el despliegue: el paso «Notificar a EasyPanel» sigue ejecutándose en el `push` que genera la fusión de un PR, así que el flujo normal no cambia.
+
+Limitación: la protección exige que el CI de la rama pase, pero el CI no se ejecuta contra el resultado de la fusión. Con «rama al día» desactivado, dos PR sanos podrían romper `main` al fusionarse uno tras otro; el CI de `main` lo detectaría, pero después de fusionar.
 
 ## 5. Cómo reproducir las mediciones
 
