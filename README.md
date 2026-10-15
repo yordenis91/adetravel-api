@@ -11,6 +11,12 @@ Backend empresarial para AdeTravel, construido con Node.js, TypeScript, Express,
 - Nodemailer
 - Pino logger
 
+## Documentación
+- [Arquitectura](docs/ARQUITECTURA.md): componentes, datos, flujo, seguridad y despliegue.
+- [Decisiones de arquitectura (ADR)](docs/adr/README.md): qué se decidió, alternativas y qué se sacrificó.
+- [Calidad y plan de trabajo](docs/CALIDAD.md): evidencia medida, brechas y siguientes pasos.
+- [Operación](OPERATIONS.md): despliegue, vuelta atrás, respaldos y alertas.
+
 ## Instalacion
 1. Copiar variables de entorno:
    - `cp .env.example .env`
