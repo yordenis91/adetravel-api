@@ -54,8 +54,20 @@ jobs:
       - name: 🔨 Construir TypeScript
         run: npm run build
 
-      - name: 🧪 Ejecutar tests con cobertura
+      - name: 🧪 Ejecutar tests con cobertura (todo src/, unitarias + e2e)
         run: npm test -- --coverage
+
+      # La cobertura de todo src/ queda a la vista en el resumen de cada ejecución.
+      - name: 📊 Publicar cobertura en el resumen
+        if: always()
+        run: |
+          node -e '
+          const fs = require("fs");
+          if (!fs.existsSync("coverage/coverage-summary.json")) process.exit(0);
+          const t = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8")).total;
+          const row = (k, n) => `| ${n} | ${t[k].pct} % | ${t[k].covered} / ${t[k].total} |`;
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, ["### Cobertura del API (todo src/)", "", "| Métrica | Cobertura | Cubierto |", "|---|---|---|", row("statements", "Sentencias"), row("branches", "Ramas"), row("functions", "Funciones"), row("lines", "Líneas"), ""].join("\n"));
+          '
 
       # Solo dispara el deploy en un push real a main (mergeado), nunca en el
       # build de un Pull Request todavía sin mergear. El token vive en un
