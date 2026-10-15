@@ -128,6 +128,16 @@ Cobertura de todo `src/` tras la fase (corrida única, 545 pruebas): 82,4 % de s
 
 Nota sobre la medición: en esa corrida el servidor estaba saturado (carga de unos 200 por otros despliegues del VPS) y 2 pruebas antiguas agotaron su tiempo; las cifras podrían ser algo mayores. Con la carga normal pasan las 30 suites e2e (212 pruebas) y las 44 unitarias (333).
 
+### 4.3 Migraciones pendientes (saltos de versión mayor)
+
+Dependabot propuso estos saltos el 15 de octubre de 2026 y se cerraron porque hoy no se pueden aplicar. Dependabot ignora ahora sus versiones mayores.
+
+| Paquete | Salto | Motivo del bloqueo | Qué hay que hacer |
+|---|---|---|---|
+| `@sentry/node` | 10 → 11 | La opción `sendDefaultPii` ya no existe; la compilación falla. Esa opción evita enviar IP, cookies y cuerpos de las peticiones. | Leer la guía de migración, localizar el equivalente y comprobar con una prueba que no se envían datos personales, antes de subir. |
+| `typescript` | 6 → 7 | `ts-jest` declara `typescript >=4.3 <7`; `npm ci` falla con `ERESOLVE`. | Esperar a que `ts-jest` soporte TypeScript 7. |
+| `dotenv` | 17 → 18 | Publica sus tipos solo por `exports`; `tsconfig.json` usa `moduleResolution: node`, que lo ignora (`TS2882`). | Cambiar la resolución de módulos (por ejemplo a `node16`), con el resto de ajustes que eso implica. |
+
 ## 5. Cómo reproducir las mediciones
 
 ```bash
