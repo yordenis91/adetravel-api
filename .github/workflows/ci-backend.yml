@@ -37,10 +37,10 @@ jobs:
       - name: 📥 Clonar el repositorio
         uses: actions/checkout@v4
 
-      - name: ⚙️ Configurar Node.js 20
+      - name: ⚙️ Configurar Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: 📦 Instalar dependencias
         run: npm ci
@@ -51,8 +51,16 @@ jobs:
       - name: 🗄️ Aplicar migraciones (Postgres de CI)
         run: npx prisma migrate deploy
 
-      - name: 🔨 Construir TypeScript
+      - name: 🔨 Construir TypeScript (comprueba tipos en modo estricto)
         run: npm run build
+
+      # Línea base de 261 avisos heredados (245 son `any`): el CI falla si aparece uno nuevo.
+      - name: 🔎 Lint (sin avisos nuevos)
+        run: npm run lint:ci
+
+      # Solo dependencias de producción; falla con severidad alta o crítica.
+      - name: 🛡️ Auditoría de dependencias
+        run: npm audit --omit=dev --audit-level=high
 
       - name: 🧪 Ejecutar tests con cobertura (todo src/, unitarias + e2e)
         run: npm test -- --coverage
