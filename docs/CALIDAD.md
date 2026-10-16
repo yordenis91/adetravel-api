@@ -71,7 +71,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H6 | ~~Sin `npm audit` ni Dependabot~~ Corregido en la fase 3 | Media | `sanitize-html` actualizado; auditoría y Dependabot en ambos repos. |
 | H7 | Importes como `Float` | Media | ADR 008. |
 | H8 | ~~Cobertura baja en autenticación, usuarios y tareas~~ Corregido en la fase 5 | Media | Autenticación 80 %, usuarios y tareas 100 %. Plantillas de correo (30 %) y permisos (71 %) siguen bajos. |
-| H9 | Sin pruebas de contrato entre API y cliente | Media | Un cambio en una respuesta del API puede romper el cliente sin que ningún test lo avise. |
+| H9 | ~~Sin pruebas de contrato entre API y cliente~~ En corrección (fase 6) | Media | Contrato del API en `contracts/api-contract.json`; ver 4.5 y ADR 017. |
 | H10 | ~~Monitoreo externo sin configurar~~ Corregido en la fase 7 | Media | Better Stack (HTTP y latido), Sentry y alertas por correo verificados el 16 de octubre de 2026. |
 | H11 | ~~Dos mecanismos de respaldo sin papeles definidos~~ Resuelto en la fase 9 | Baja | ADR 016: el del VPS es el oficial ante desastres; el del API, para error humano. Ambos están activos. Pendiente opcional: latido externo para el del API. |
 | H12 | Numeración sin prueba de concurrencia | Baja | ADR 009. |
@@ -79,6 +79,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H15 | Tipado poco estricto en el cliente | Media | `tsconfig.app.json` del cliente tiene `strictNullChecks`, `noImplicitAny` y `noUnusedLocals` desactivados (el API sí usa `strict`). `tsc` pasa, pero comprueba menos de lo que parece. Activar el modo estricto por pasos es trabajo propio. |
 | H16 | ~~Un administrador que restablece la contraseña de otro usuario no cierra sus sesiones abiertas~~ Corregido el 15 de octubre de 2026 | Media | Comprobado con una prueba desechable: tras `PATCH /api/users/:id` con `password`, la sesión anterior del usuario sigue devolviendo 200. El cambio desde el perfil y el restablecimiento por correo sí las cierran. Corregido incrementando `tokenVersion` al cambiar la contraseña; la prueba de `users-management` comprueba que la sesión anterior responde 401 `TOKEN_REVOKED`. |
 | H17 | Esquema de validación duplicado y sin uso | Baja | `src/schemas/users.schemas.ts` define otro `updateUserSchema`; las rutas usan `src/validators/users.validator.ts`. El primero induce a error. |
+| H18 | El inicio de sesión devolvía campos internos del usuario | Media | `POST /auth/login` y `/auth/register` quitaban solo `passwordHash` y devolvían `tokenVersion`, `resetPasswordToken` y `resetPasswordExpires`. Lo destapó la revisión del contrato; corregido el 16 de octubre de 2026 (PR #86) con una lista blanca. |
 | H14 | ~~Documentos sueltos y antiguos en la raíz de los repos~~ Resuelto en la fase 9 | Baja | El 16 de octubre de 2026 se borraron los informes de tareas terminadas y las notas copiadas del API que estaban en el repo del cliente; los documentos útiles pasaron a `docs/` (cliente) y `docs/archivo/` (API, marcados como no revisados). |
 
 ## 4. Plan de trabajo
@@ -92,7 +93,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | **Hecho** el 15 de octubre de 2026 (ver 4.1) |
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | **Hecho** el 15 de octubre de 2026 (ver 4.4) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
-| 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
+| 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | **En curso**: contrato del API hecho (ADR 017, ver 4.5); falta la copia y las comprobaciones en el cliente |
 | 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **Hecho** el 16 de octubre de 2026 (ver [`MONITOREO.md`](MONITOREO.md)); queda observar la primera ejecución nocturna del respaldo con el latido |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
 | 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | **Hecho** el 16 de octubre de 2026 (ADR 016 y `docs/archivo/`) |
@@ -154,6 +155,15 @@ Aplicada el 15 de octubre de 2026 en `adetravel-api` y `adetravel-client`:
 Efecto sobre el despliegue: el paso «Notificar a EasyPanel» sigue ejecutándose en el `push` que genera la fusión de un PR, así que el flujo normal no cambia.
 
 Limitación: la protección exige que el CI de la rama pase, pero el CI no se ejecuta contra el resultado de la fusión. Con «rama al día» desactivado, dos PR sanos podrían romper `main` al fusionarse uno tras otro; el CI de `main` lo detectaría, pero después de fusionar.
+
+### 4.5 Contrato API-cliente (fase 6)
+
+`contracts/api-contract.json` es la instantánea aceptada de 19 respuestas clave y de las listas de valores que el cliente duplica (ADR 017). El test `api-contract.e2e.test.ts` la compara con el API real en cada ejecución del CI.
+
+- **Cambio intencionado de una respuesta o de una lista de valores:** `UPDATE_CONTRACT=1 npm run test:e2e`, revisar el diff de `contracts/api-contract.json` en el pull request y sincronizar el cliente.
+- **Primer fruto:** el inicio de sesión devolvía campos internos (H18).
+- **Fragilidad corregida de paso:** el test de estadísticas de la bitácora comparaba cifras globales en dos llamadas y podía fallar si otra suite borraba entradas entre ambas; ahora siembra un margen amplio de eventos propios.
+- **Límites:** verifica la forma con los datos de la muestra, no el uso que hace el cliente de cada campo.
 
 ## 5. Cómo reproducir las mediciones
 

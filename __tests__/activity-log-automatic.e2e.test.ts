@@ -57,10 +57,21 @@ describe("eventos automáticos en la bitácora (integración con Postgres)", () 
   });
 
   it("las estadísticas también excluyen lo automático salvo que se pida", async () => {
-    const hidden = (await get("/api/activity-logs/stats?days=7")).body.data;
-    const all = (await get("/api/activity-logs/stats?days=7&includeAutomatic=true")).body.data;
-    expect(all.total).toBeGreaterThan(hidden.total);
-    expect(all.recent).toBeGreaterThan(hidden.recent);
-    expect(all.today).toBeGreaterThan(hidden.today);
+    // Las estadísticas son globales y se piden en dos llamadas: otras suites crean y borran entradas de
+    // bitácora entre ambas. Con un margen amplio de eventos automáticos propios, esa interferencia no
+    // puede invertir la comparación (antes bastaba con que otra suite borrara una entrada).
+    const massLabel = `${tag} masa-automatica`;
+    await prisma.activityLog.createMany({
+      data: Array.from({ length: 60 }, () => ({ action: "SYNC_API", entityType: "SystemConfig", entityId: "cfg", entityLabel: massLabel, performedBy: null })),
+    });
+    try {
+      const hidden = (await get("/api/activity-logs/stats?days=7")).body.data;
+      const all = (await get("/api/activity-logs/stats?days=7&includeAutomatic=true")).body.data;
+      expect(all.total).toBeGreaterThan(hidden.total);
+      expect(all.recent).toBeGreaterThan(hidden.recent);
+      expect(all.today).toBeGreaterThan(hidden.today);
+    } finally {
+      await prisma.activityLog.deleteMany({ where: { entityLabel: massLabel } });
+    }
   });
 });

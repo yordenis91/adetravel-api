@@ -1,0 +1,1028 @@
+{
+  "version": 1,
+  "nota": "Generado por __tests__/api-contract.e2e.test.ts. No editar a mano: UPDATE_CONTRACT=1 npm run test:e2e",
+  "enums": {
+    "workflowStatuses": [
+      "RECEPCIONADA",
+      "SERVICIOS_ASIGNADOS_PARA_COTIZAR",
+      "ENVIADO_A_PROVEEDOR",
+      "COTIZADO_POR_PROVEEDOR",
+      "COTIZADO_POR_ADETRAVEL",
+      "ENVIADO_AL_CLIENTE",
+      "ACEPTADA_POR_CLIENTE",
+      "ENVIADA_SOLICITUD_CONFIRMACION_PROVEEDOR",
+      "CONFIRMADA_POR_PROVEEDOR",
+      "ENVIADA_CONFIRMACION_CLIENTE",
+      "ENVIADA_SOLICITUD_PAGO_CLIENTE",
+      "PAGADO_POR_CLIENTE",
+      "PAGADO_AL_PROVEEDOR",
+      "VOUCHER_EMITIDO",
+      "VOUCHER_ENTREGADO",
+      "VENDIDA",
+      "CANCELADA"
+    ],
+    "validTransitions": {
+      "RECEPCIONADA": [
+        "SERVICIOS_ASIGNADOS_PARA_COTIZAR",
+        "CANCELADA"
+      ],
+      "SERVICIOS_ASIGNADOS_PARA_COTIZAR": [
+        "ENVIADO_A_PROVEEDOR",
+        "CANCELADA"
+      ],
+      "ENVIADO_A_PROVEEDOR": [
+        "COTIZADO_POR_PROVEEDOR",
+        "CANCELADA"
+      ],
+      "COTIZADO_POR_PROVEEDOR": [
+        "COTIZADO_POR_ADETRAVEL",
+        "CANCELADA"
+      ],
+      "COTIZADO_POR_ADETRAVEL": [
+        "ENVIADO_AL_CLIENTE",
+        "CANCELADA"
+      ],
+      "ENVIADO_AL_CLIENTE": [
+        "ACEPTADA_POR_CLIENTE",
+        "RECEPCIONADA",
+        "CANCELADA"
+      ],
+      "ACEPTADA_POR_CLIENTE": [
+        "ENVIADA_SOLICITUD_CONFIRMACION_PROVEEDOR",
+        "CANCELADA"
+      ],
+      "ENVIADA_SOLICITUD_CONFIRMACION_PROVEEDOR": [
+        "CONFIRMADA_POR_PROVEEDOR",
+        "ENVIADO_AL_CLIENTE",
+        "CANCELADA"
+      ],
+      "CONFIRMADA_POR_PROVEEDOR": [
+        "ENVIADA_CONFIRMACION_CLIENTE",
+        "CANCELADA"
+      ],
+      "ENVIADA_CONFIRMACION_CLIENTE": [
+        "ENVIADA_SOLICITUD_PAGO_CLIENTE",
+        "CANCELADA"
+      ],
+      "ENVIADA_SOLICITUD_PAGO_CLIENTE": [
+        "PAGADO_POR_CLIENTE",
+        "CANCELADA"
+      ],
+      "PAGADO_POR_CLIENTE": [
+        "PAGADO_AL_PROVEEDOR"
+      ],
+      "PAGADO_AL_PROVEEDOR": [
+        "VOUCHER_EMITIDO"
+      ],
+      "VOUCHER_EMITIDO": [
+        "VOUCHER_ENTREGADO"
+      ],
+      "VOUCHER_ENTREGADO": [
+        "VENDIDA"
+      ],
+      "VENDIDA": [],
+      "CANCELADA": [
+        "RECEPCIONADA"
+      ]
+    },
+    "serviceTypes": [
+      "SEGURO",
+      "VISA",
+      "ALOJAMIENTO",
+      "PASAJE_AEREO",
+      "ARRIENDO_AUTO",
+      "EXCURSION",
+      "TRASLADO",
+      "CRUCERO",
+      "CIRCUITO"
+    ],
+    "userRole": [
+      "ADMINISTRADOR",
+      "USUARIO"
+    ],
+    "agencyRole": [
+      "GERENTE",
+      "FINANZAS",
+      "OPERACIONES",
+      "AGENTE_VENTAS"
+    ],
+    "quotationStatus": [
+      "BORRADOR",
+      "ENVIADA",
+      "ACEPTADA",
+      "RECHAZADA"
+    ],
+    "paymentStatus": [
+      "PENDIENTE",
+      "COMPLETADO",
+      "CANCELADO"
+    ],
+    "paymentMethod": [
+      "EFECTIVO",
+      "TARJETA",
+      "TRANSFERENCIA",
+      "CHEQUE",
+      "WEBPAY"
+    ],
+    "voucherStatus": [
+      "BORRADOR",
+      "EMITIDO",
+      "CANCELADO"
+    ],
+    "permissions": [
+      "CREATE_CLIENT",
+      "DELETE_CLIENT",
+      "DELETE_CONFIRMATION",
+      "DELETE_PAYMENT",
+      "DELETE_PROVIDER",
+      "DELETE_QUOTATION",
+      "DELETE_REQUEST",
+      "DELETE_SERVICE",
+      "DELETE_TEMPLATE",
+      "DELETE_VOUCHER",
+      "MANAGE_CATALOGS",
+      "MANAGE_CONFIRMATIONS",
+      "MANAGE_PAYMENTS",
+      "MANAGE_PERMISSIONS",
+      "MANAGE_PROVIDERS",
+      "MANAGE_QUOTATIONS",
+      "MANAGE_REQUESTS",
+      "MANAGE_SERVICES",
+      "MANAGE_SYSTEM_CONFIG",
+      "MANAGE_TEMPLATES",
+      "MANAGE_USERS",
+      "MANAGE_VOUCHERS",
+      "PURGE_LOGS",
+      "RUN_JOBS",
+      "SEND_BIRTHDAY_EMAILS",
+      "VIEW_CATALOGS",
+      "VIEW_CLIENTS",
+      "VIEW_CONFIRMATIONS",
+      "VIEW_LOGS",
+      "VIEW_PAYMENTS",
+      "VIEW_PROVIDERS",
+      "VIEW_QUOTATIONS",
+      "VIEW_REPORTS",
+      "VIEW_REQUESTS",
+      "VIEW_SERVICES",
+      "VIEW_TEMPLATES",
+      "VIEW_USERS",
+      "VIEW_VOUCHERS"
+    ]
+  },
+  "responses": {
+    "POST /auth/login": {
+      "status": 200,
+      "body": {
+        "data": {
+          "token": "string",
+          "user": {
+            "agencyRole": "string",
+            "createdAt": "string",
+            "department": "string",
+            "email": "string",
+            "fullName": "string",
+            "id": "string",
+            "isActive": "boolean",
+            "permissions": {
+              "$array": "string"
+            },
+            "phone": "string",
+            "role": "string"
+          }
+        }
+      }
+    },
+    "GET /auth/me": {
+      "status": 200,
+      "body": {
+        "data": {
+          "agencyRole": "string",
+          "createdAt": "string",
+          "department": "string",
+          "email": "string",
+          "fullName": "string",
+          "id": "string",
+          "isActive": "boolean",
+          "permissions": {
+            "$array": "string"
+          },
+          "phone": "string",
+          "role": "string"
+        }
+      }
+    },
+    "GET /clients": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "_count": {
+              "requests": "number"
+            },
+            "address": "string",
+            "bankAccount": "string",
+            "bankAccountHolder": "string",
+            "bankEmail": "string",
+            "bankName": "string",
+            "birthDate": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "email": "string",
+            "firstName": "string",
+            "frequentFlyerNumbers": {
+              "$array": "string"
+            },
+            "id": "string",
+            "isActive": "boolean",
+            "lastBirthdayEmailYear": "null",
+            "lastName": "string",
+            "nationality": "string",
+            "passportCountry": "string",
+            "passportExpiry": "string",
+            "passportIssueDate": "string",
+            "passportNumber": "string",
+            "phone": "string",
+            "referralSource": "string",
+            "restrictions": "string",
+            "rut": "string",
+            "updatedAt": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /clients/:id": {
+      "status": 200,
+      "body": {
+        "data": {
+          "address": "string",
+          "bankAccount": "string",
+          "bankAccountHolder": "string",
+          "bankEmail": "string",
+          "bankName": "string",
+          "birthDate": "string",
+          "createdAt": "string",
+          "createdBy": "string",
+          "email": "string",
+          "firstName": "string",
+          "frequentFlyerNumbers": {
+            "$array": "string"
+          },
+          "id": "string",
+          "isActive": "boolean",
+          "lastBirthdayEmailYear": "null",
+          "lastName": "string",
+          "nationality": "string",
+          "passportCountry": "string",
+          "passportExpiry": "string",
+          "passportIssueDate": "string",
+          "passportNumber": "string",
+          "phone": "string",
+          "referralSource": "string",
+          "requests": {
+            "$array": {
+              "createdAt": "string",
+              "destinationCity": "string",
+              "destinationCountry": "string",
+              "id": "string",
+              "requestNumber": "string",
+              "status": "string"
+            }
+          },
+          "restrictions": "string",
+          "rut": "string",
+          "updatedAt": "string"
+        }
+      }
+    },
+    "GET /providers": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "address": "string",
+            "bankAccount": "string",
+            "bankAccountHolder": "string",
+            "bankName": "string",
+            "businessType": "string",
+            "city": "string",
+            "contactEmail": "string",
+            "contactName": "string",
+            "contactPhone": "string",
+            "contactRut": "string",
+            "country": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "email": "string",
+            "executiveEmail": "string",
+            "executiveName": "string",
+            "executivePhone": "string",
+            "fantasyName": "string",
+            "id": "string",
+            "isActive": "boolean",
+            "name": "string",
+            "paymentMethod": "string",
+            "phone": "string",
+            "rut": "string",
+            "updatedAt": "string",
+            "vatPercentage": "number"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /requests": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "budgetMax": "number",
+            "budgetMin": "number",
+            "cancellationReason": "string",
+            "client": {
+              "address": "string",
+              "bankAccount": "string",
+              "bankAccountHolder": "string",
+              "bankEmail": "string",
+              "bankName": "string",
+              "birthDate": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "email": "string",
+              "firstName": "string",
+              "frequentFlyerNumbers": {
+                "$array": "string"
+              },
+              "id": "string",
+              "isActive": "boolean",
+              "lastBirthdayEmailYear": "null",
+              "lastName": "string",
+              "nationality": "string",
+              "passportCountry": "string",
+              "passportExpiry": "string",
+              "passportIssueDate": "string",
+              "passportNumber": "string",
+              "phone": "string",
+              "referralSource": "string",
+              "restrictions": "string",
+              "rut": "string",
+              "updatedAt": "string"
+            },
+            "clientId": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "createdByName": "string",
+            "description": "string",
+            "destinationCity": "string",
+            "destinationCountry": "string",
+            "durationDays": "number",
+            "id": "string",
+            "isPackage": "boolean",
+            "originCity": "string",
+            "originCountry": "string",
+            "requestDate": "string",
+            "requestNumber": "string",
+            "services": {
+              "$array": "string"
+            },
+            "status": "string",
+            "updatedAt": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /requests/:id": {
+      "status": 200,
+      "body": {
+        "data": {
+          "budgetMax": "number",
+          "budgetMin": "number",
+          "cancellationReason": "string",
+          "client": {
+            "address": "string",
+            "bankAccount": "string",
+            "bankAccountHolder": "string",
+            "bankEmail": "string",
+            "bankName": "string",
+            "birthDate": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "email": "string",
+            "firstName": "string",
+            "frequentFlyerNumbers": {
+              "$array": "string"
+            },
+            "id": "string",
+            "isActive": "boolean",
+            "lastBirthdayEmailYear": "null",
+            "lastName": "string",
+            "nationality": "string",
+            "passportCountry": "string",
+            "passportExpiry": "string",
+            "passportIssueDate": "string",
+            "passportNumber": "string",
+            "phone": "string",
+            "referralSource": "string",
+            "restrictions": "string",
+            "rut": "string",
+            "updatedAt": "string"
+          },
+          "clientId": "string",
+          "confirmations": {
+            "$array": {
+              "confirmationNumber": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "exchangeRate": "number",
+              "id": "string",
+              "notes": "string",
+              "price": "number",
+              "providerConfirmationNumber": "string",
+              "providerId": "string",
+              "requestId": "string",
+              "serviceId": "string",
+              "updatedAt": "string",
+              "validUntil": "string"
+            }
+          },
+          "createdAt": "string",
+          "createdBy": "string",
+          "createdByName": "string",
+          "description": "string",
+          "destinationCity": "string",
+          "destinationCountry": "string",
+          "durationDays": "number",
+          "id": "string",
+          "isPackage": "boolean",
+          "originCity": "string",
+          "originCountry": "string",
+          "payments": {
+            "$array": {
+              "amount": "number",
+              "clientId": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "currency": "string",
+              "id": "string",
+              "method": "string",
+              "notes": "string",
+              "paymentDate": "string",
+              "paymentNumber": "string",
+              "quotationId": "string",
+              "reference": "string",
+              "requestId": "string",
+              "status": "string",
+              "updatedAt": "string"
+            }
+          },
+          "quotations": {
+            "$array": {
+              "clientId": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "currency": "string",
+              "discount": "number",
+              "id": "string",
+              "items": "array",
+              "notes": "string",
+              "quotationNumber": "string",
+              "requestId": "string",
+              "serviceId": "string",
+              "status": "string",
+              "subtotal": "number",
+              "taxAmount": "number",
+              "taxPercentage": "number",
+              "termsAndConditions": "string",
+              "total": "number",
+              "updatedAt": "string",
+              "validUntil": "string"
+            }
+          },
+          "requestDate": "string",
+          "requestNumber": "string",
+          "services": {
+            "$array": "string"
+          },
+          "servicesList": {
+            "$array": {
+              "cancellationReason": "string",
+              "clientId": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "currency": "string",
+              "details": "object",
+              "id": "string",
+              "price": "number",
+              "providerId": "string",
+              "requestId": "string",
+              "serviceNumber": "string",
+              "status": "string",
+              "type": "string",
+              "updatedAt": "string"
+            }
+          },
+          "status": "string",
+          "updatedAt": "string",
+          "vouchers": {
+            "$array": {
+              "amount": "number",
+              "checkIn": "string",
+              "checkOut": "string",
+              "clientId": "string",
+              "confirmationCode": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "currency": "string",
+              "destination": "string",
+              "id": "string",
+              "notes": "string",
+              "passengerNames": {
+                "$array": "string"
+              },
+              "providerId": "string",
+              "requestId": "string",
+              "serviceDetails": "string",
+              "serviceName": "string",
+              "serviceType": "string",
+              "status": "string",
+              "updatedAt": "string",
+              "voucherNumber": "string"
+            }
+          }
+        }
+      }
+    },
+    "GET /services": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "cancellationReason": "string",
+            "client": {
+              "firstName": "string",
+              "lastName": "string"
+            },
+            "clientId": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "currency": "string",
+            "details": "object",
+            "id": "string",
+            "price": "number",
+            "provider": {
+              "fantasyName": "string",
+              "name": "string"
+            },
+            "providerId": "string",
+            "request": {
+              "isPackage": "boolean",
+              "requestNumber": "string"
+            },
+            "requestId": "string",
+            "serviceNumber": "string",
+            "status": "string",
+            "type": "string",
+            "updatedAt": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /quotations": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "client": {
+              "address": "string",
+              "bankAccount": "string",
+              "bankAccountHolder": "string",
+              "bankEmail": "string",
+              "bankName": "string",
+              "birthDate": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "email": "string",
+              "firstName": "string",
+              "frequentFlyerNumbers": {
+                "$array": "string"
+              },
+              "id": "string",
+              "isActive": "boolean",
+              "lastBirthdayEmailYear": "null",
+              "lastName": "string",
+              "nationality": "string",
+              "passportCountry": "string",
+              "passportExpiry": "string",
+              "passportIssueDate": "string",
+              "passportNumber": "string",
+              "phone": "string",
+              "referralSource": "string",
+              "restrictions": "string",
+              "rut": "string",
+              "updatedAt": "string"
+            },
+            "clientId": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "currency": "string",
+            "discount": "number",
+            "id": "string",
+            "items": "array",
+            "notes": "string",
+            "quotationNumber": "string",
+            "request": {
+              "budgetMax": "number",
+              "budgetMin": "number",
+              "cancellationReason": "string",
+              "clientId": "string",
+              "createdAt": "string",
+              "createdBy": "string",
+              "description": "string",
+              "destinationCity": "string",
+              "destinationCountry": "string",
+              "durationDays": "number",
+              "id": "string",
+              "isPackage": "boolean",
+              "originCity": "string",
+              "originCountry": "string",
+              "requestDate": "string",
+              "requestNumber": "string",
+              "services": {
+                "$array": "string"
+              },
+              "status": "string",
+              "updatedAt": "string"
+            },
+            "requestId": "string",
+            "serviceId": "string",
+            "status": "string",
+            "subtotal": "number",
+            "taxAmount": "number",
+            "taxPercentage": "number",
+            "termsAndConditions": "string",
+            "total": "number",
+            "updatedAt": "string",
+            "validUntil": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /quotations/:id": {
+      "status": 200,
+      "body": {
+        "data": {
+          "client": {
+            "address": "string",
+            "bankAccount": "string",
+            "bankAccountHolder": "string",
+            "bankEmail": "string",
+            "bankName": "string",
+            "birthDate": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "email": "string",
+            "firstName": "string",
+            "frequentFlyerNumbers": {
+              "$array": "string"
+            },
+            "id": "string",
+            "isActive": "boolean",
+            "lastBirthdayEmailYear": "null",
+            "lastName": "string",
+            "nationality": "string",
+            "passportCountry": "string",
+            "passportExpiry": "string",
+            "passportIssueDate": "string",
+            "passportNumber": "string",
+            "phone": "string",
+            "referralSource": "string",
+            "restrictions": "string",
+            "rut": "string",
+            "updatedAt": "string"
+          },
+          "clientId": "string",
+          "createdAt": "string",
+          "createdBy": "string",
+          "currency": "string",
+          "discount": "number",
+          "id": "string",
+          "items": "array",
+          "notes": "string",
+          "quotationNumber": "string",
+          "request": {
+            "budgetMax": "number",
+            "budgetMin": "number",
+            "cancellationReason": "string",
+            "clientId": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "description": "string",
+            "destinationCity": "string",
+            "destinationCountry": "string",
+            "durationDays": "number",
+            "id": "string",
+            "isPackage": "boolean",
+            "originCity": "string",
+            "originCountry": "string",
+            "requestDate": "string",
+            "requestNumber": "string",
+            "services": {
+              "$array": "string"
+            },
+            "status": "string",
+            "updatedAt": "string"
+          },
+          "requestId": "string",
+          "serviceId": "string",
+          "status": "string",
+          "subtotal": "number",
+          "taxAmount": "number",
+          "taxPercentage": "number",
+          "termsAndConditions": "string",
+          "total": "number",
+          "updatedAt": "string",
+          "validUntil": "string"
+        }
+      }
+    },
+    "GET /confirmations": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "confirmationNumber": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "exchangeRate": "number",
+            "id": "string",
+            "notes": "string",
+            "price": "number",
+            "provider": {
+              "fantasyName": "string",
+              "name": "string"
+            },
+            "providerConfirmationNumber": "string",
+            "providerId": "string",
+            "request": {
+              "isPackage": "boolean",
+              "requestNumber": "string"
+            },
+            "requestId": "string",
+            "service": {
+              "serviceNumber": "string",
+              "type": "string"
+            },
+            "serviceId": "string",
+            "updatedAt": "string",
+            "validUntil": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /payments": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "amount": "number",
+            "client": {
+              "email": "string",
+              "firstName": "string",
+              "lastName": "string"
+            },
+            "clientId": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "currency": "string",
+            "id": "string",
+            "method": "string",
+            "notes": "string",
+            "paymentDate": "string",
+            "paymentNumber": "string",
+            "quotation": {
+              "quotationNumber": "string"
+            },
+            "quotationId": "string",
+            "reference": "string",
+            "request": {
+              "requestNumber": "string"
+            },
+            "requestId": "string",
+            "status": "string",
+            "updatedAt": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /vouchers": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "amount": "number",
+            "checkIn": "string",
+            "checkOut": "string",
+            "client": {
+              "email": "string",
+              "firstName": "string",
+              "lastName": "string"
+            },
+            "clientId": "string",
+            "confirmationCode": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "currency": "string",
+            "destination": "string",
+            "id": "string",
+            "notes": "string",
+            "passengerNames": {
+              "$array": "string"
+            },
+            "provider": {
+              "fantasyName": "string",
+              "name": "string"
+            },
+            "providerId": "string",
+            "request": {
+              "destinationCity": "string",
+              "requestNumber": "string"
+            },
+            "requestId": "string",
+            "serviceDetails": "string",
+            "serviceName": "string",
+            "serviceType": "string",
+            "status": "string",
+            "updatedAt": "string",
+            "voucherNumber": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /users": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "agencyRole": "string",
+            "createdAt": "string",
+            "email": "string",
+            "fullName": "string",
+            "id": "string",
+            "isActive": "boolean",
+            "role": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /tasks": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "assigneeName": "string",
+            "createdAt": "string",
+            "createdBy": "string",
+            "createdByName": "string",
+            "description": "string",
+            "dueDate": "string",
+            "id": "string",
+            "priority": "string",
+            "relatedEntityId": "string",
+            "relatedEntityLabel": "string",
+            "relatedEntityType": "string",
+            "status": "string",
+            "title": "string",
+            "updatedAt": "string",
+            "userId": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /notifications": {
+      "status": 200,
+      "body": {
+        "data": {
+          "items": "array",
+          "limit": "number",
+          "page": "number",
+          "total": "number",
+          "unreadCount": "number"
+        }
+      }
+    },
+    "GET /activity-logs": {
+      "status": 200,
+      "body": {
+        "data": {
+          "$array": {
+            "action": "string",
+            "createdAt": "string",
+            "description": "string",
+            "entityId": "string",
+            "entityLabel": "string",
+            "entityType": "string",
+            "id": "string",
+            "metadata": "string",
+            "performedBy": "string",
+            "updatedAt": "string"
+          }
+        },
+        "limit": "number",
+        "page": "number",
+        "total": "number"
+      }
+    },
+    "GET /search": {
+      "status": 200,
+      "body": {
+        "data": {
+          "clients": {
+            "$array": {
+              "email": "string",
+              "firstName": "string",
+              "id": "string",
+              "lastName": "string",
+              "rut": "string"
+            }
+          },
+          "payments": {
+            "$array": {
+              "amount": "number",
+              "currency": "string",
+              "id": "string",
+              "paymentNumber": "string",
+              "status": "string"
+            }
+          },
+          "quotations": {
+            "$array": {
+              "currency": "string",
+              "id": "string",
+              "quotationNumber": "string",
+              "status": "string",
+              "total": "number"
+            }
+          },
+          "requests": {
+            "$array": {
+              "destinationCity": "string",
+              "id": "string",
+              "requestNumber": "string",
+              "status": "string"
+            }
+          },
+          "vouchers": {
+            "$array": {
+              "confirmationCode": "string",
+              "id": "string",
+              "serviceName": "string",
+              "voucherNumber": "string"
+            }
+          }
+        }
+      }
+    },
+    "GET /system-config/agency": {
+      "status": 200,
+      "body": {
+        "data": {
+          "address": "null|string",
+          "email": "null|string",
+          "name": "null|string",
+          "phone": "null|string",
+          "rut": "null|string",
+          "website": "null|string"
+        }
+      }
+    }
+  }
+}
