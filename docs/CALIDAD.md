@@ -93,7 +93,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | **Hecho** el 15 de octubre de 2026 (ver 4.4) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
-| 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **En curso**: `SENTRY_DSN` verificado y script de respaldo con latido listo (ver [`MONITOREO.md`](MONITOREO.md)); monitores HTTP de la API y la web creados en Better Stack; faltan el latido del respaldo y aplicar `ALERT_EMAIL` en el API |
+| 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **En curso**: `SENTRY_DSN` verificado y script de respaldo con latido listo (ver [`MONITOREO.md`](MONITOREO.md)); `ALERT_EMAIL` aplicado en el API, latido del respaldo activo y monitores HTTP creados en Better Stack; falta confirmar en los paneles de Better Stack y Sentry y ver la primera ejecución nocturna |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
 | 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | Pendiente |
 
