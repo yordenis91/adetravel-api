@@ -73,6 +73,20 @@ describe("autenticación (integración con Postgres)", () => {
       expect(res.body.data.user.permissions.length).toBeGreaterThan(0);
     });
 
+    it("devuelve solo los datos públicos del usuario: nada de hashes, versión de token ni enlaces pendientes", async () => {
+      await prisma.user.update({
+        where: { id: users.admin.id },
+        data: { resetPasswordToken: sha256("enlace-pendiente"), resetPasswordExpires: new Date(Date.now() + 3_600_000) },
+      });
+      const res = await login(users.admin.email, PASSWORD);
+      expect(res.status).toBe(200);
+      expect(Object.keys(res.body.data.user).sort()).toEqual(
+        ["agencyRole", "createdAt", "department", "email", "fullName", "id", "isActive", "permissions", "phone", "role"]
+      );
+      expect(JSON.stringify(res.body)).not.toMatch(/passwordHash|resetPassword|tokenVersion/);
+      await prisma.user.update({ where: { id: users.admin.id }, data: { resetPasswordToken: null, resetPasswordExpires: null } });
+    });
+
     it("no distingue mayúsculas en el correo", async () => {
       const res = await login(users.plain.email.toUpperCase(), PASSWORD);
       expect(res.status).toBe(200);
