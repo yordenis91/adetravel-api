@@ -53,8 +53,21 @@ Con `EMAIL_DELIVERY=redirect` (como está hoy), el correo de las alertas del API
 
 ## 5. Estado (16 de octubre de 2026)
 
-- **Hecho:** `SENTRY_DSN` definido en el API y presente en el paquete del cliente; la URL de salud y la web responden 200 desde fuera; el script de respaldo del VPS ya sabe enviar el latido (probado en local, opcional); creados en Better Stack los monitores HTTP de la API y de la web (según indica quien administra la cuenta; no verificable desde el servidor).
+- **Hecho y comprobado en el servidor:**
+  - `SENTRY_DSN` definido en el API y presente en el paquete del cliente.
+  - `ALERT_EMAIL` definido en el contenedor del API en marcha.
+  - La URL de salud y la web responden 200 desde fuera.
+  - `HEARTBEAT_URL` configurada en `/etc/backup-vps.conf` (permisos 600). Una ejecución real del script (`--local`) envió primero `/fail` (por el error de la incidencia de abajo) y, ya corregido, el latido de éxito.
+- **Hecho según indica quien administra la cuenta, no verificable desde el servidor:** monitores HTTP de la API y de la web en Better Stack, y el latido del respaldo creado.
 - **Pendiente:**
-  - `ALERT_EMAIL` está definido en Easypanel pero **el contenedor del API en marcha no lo tiene todavía**: hay que reiniciar o redesplegar el servicio para que lo aplique. Comprobar después con `printenv ALERT_EMAIL` dentro del contenedor.
-  - Crear el latido del respaldo en Better Stack y pegar su URL en `/etc/backup-vps.conf` como `HEARTBEAT_URL`. Hasta entonces, si el respaldo dejara de ejecutarse solo se sabría por la ausencia del correo de fallo, que no cubre ese caso.
+  - Confirmar en el panel de Better Stack que el latido figura como «Up» y que los dos monitores HTTP están en verde.
   - Comprobar en el panel de Sentry que llegan eventos.
+  - Primera ejecución nocturna real (03:30, con subida a Drive) con el latido activo: revisar `.last_ok` y el panel al día siguiente.
+
+## 6. Incidencia encontrada al probar el latido (16 de octubre de 2026)
+
+Al ejecutar el respaldo a mano, el volcado de `vortex` falló. El script elegía el contenedor con el filtro `name=^deploy_vortex-db`, que también coincide con `deploy_vortex-db_pgweb` (la interfaz web de la base), y tomaba el primero que Docker listaba. Había funcionado hasta entonces solo por el orden de los contenedores; `yws` tenía el mismo riesgo con `deploy_yws-db_dbgate`.
+
+Corrección: el filtro exige el punto que Swarm añade tras el nombre del servicio (`name=^deploy_vortex-db\.`), de modo que cada prefijo resuelve a un único contenedor. Tras el arreglo, las cuatro bases (adetravel, vortex, yws y typebot) se vuelcan y cifran sin errores.
+
+Sin esta prueba, el respaldo de esa noche habría fallado para `vortex`. El correo de fallo lo habría avisado, pero es un ejemplo de por qué conviene el latido además del aviso: ambos se ejercitaron en esta prueba.
