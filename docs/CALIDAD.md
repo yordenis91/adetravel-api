@@ -71,7 +71,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H6 | ~~Sin `npm audit` ni Dependabot~~ Corregido en la fase 3 | Media | `sanitize-html` actualizado; auditoría y Dependabot en ambos repos. |
 | H7 | Importes como `Float` | Media | ADR 008. |
 | H8 | ~~Cobertura baja en autenticación, usuarios y tareas~~ Corregido en la fase 5 | Media | Autenticación 80 %, usuarios y tareas 100 %. Plantillas de correo (30 %) y permisos (71 %) siguen bajos. |
-| H9 | ~~Sin pruebas de contrato entre API y cliente~~ En corrección (fase 6) | Media | Contrato del API en `contracts/api-contract.json`; ver 4.5 y ADR 017. |
+| H9 | ~~Sin pruebas de contrato entre API y cliente~~ Corregido en la fase 6 | Media | Contrato del API en `contracts/api-contract.json` y copia en el cliente con sus pruebas; ver 4.5 y ADR 017. |
 | H10 | ~~Monitoreo externo sin configurar~~ Corregido en la fase 7 | Media | Better Stack (HTTP y latido), Sentry y alertas por correo verificados el 16 de octubre de 2026. |
 | H11 | ~~Dos mecanismos de respaldo sin papeles definidos~~ Resuelto en la fase 9 | Baja | ADR 016: el del VPS es el oficial ante desastres; el del API, para error humano. Ambos están activos. Pendiente opcional: latido externo para el del API. |
 | H12 | Numeración sin prueba de concurrencia | Baja | ADR 009. |
@@ -80,6 +80,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H16 | ~~Un administrador que restablece la contraseña de otro usuario no cierra sus sesiones abiertas~~ Corregido el 15 de octubre de 2026 | Media | Comprobado con una prueba desechable: tras `PATCH /api/users/:id` con `password`, la sesión anterior del usuario sigue devolviendo 200. El cambio desde el perfil y el restablecimiento por correo sí las cierran. Corregido incrementando `tokenVersion` al cambiar la contraseña; la prueba de `users-management` comprueba que la sesión anterior responde 401 `TOKEN_REVOKED`. |
 | H17 | Esquema de validación duplicado y sin uso | Baja | `src/schemas/users.schemas.ts` define otro `updateUserSchema`; las rutas usan `src/validators/users.validator.ts`. El primero induce a error. |
 | H18 | El inicio de sesión devolvía campos internos del usuario | Media | `POST /auth/login` y `/auth/register` quitaban solo `passwordHash` y devolvían `tokenVersion`, `resetPasswordToken` y `resetPasswordExpires`. Lo destapó la revisión del contrato; corregido el 16 de octubre de 2026 (PR #86) con una lista blanca. |
+| H19 | La fecha de emisión de vouchers y cotizaciones mostraba siempre la fecha de hoy | Media | La vista previa leía `created_at`, que el API no devuelve (devuelve `createdAt`). Lo destapó la comprobación de campos del contrato; corregido el 16 de octubre de 2026 (PR #62 del cliente). Los documentos ya impresos no se corrigen. |
 | H14 | ~~Documentos sueltos y antiguos en la raíz de los repos~~ Resuelto en la fase 9 | Baja | El 16 de octubre de 2026 se borraron los informes de tareas terminadas y las notas copiadas del API que estaban en el repo del cliente; los documentos útiles pasaron a `docs/` (cliente) y `docs/archivo/` (API, marcados como no revisados). |
 
 ## 4. Plan de trabajo
@@ -93,7 +94,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 3 | Puertas de calidad en el CI: `tsc` y ESLint en el cliente, ESLint en el API, `npm audit`, Dependabot, corregir `sanitize-html` | H4, H5, H6 | **Hecho** el 15 de octubre de 2026 (ver 4.1) |
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | **Hecho** el 15 de octubre de 2026 (ver 4.4) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
-| 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | **En curso**: contrato del API hecho (ADR 017, ver 4.5); falta la copia y las comprobaciones en el cliente |
+| 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | **Hecho** el 16 de octubre de 2026 (ADR 017, ver 4.5) |
 | 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **Hecho** el 16 de octubre de 2026 (ver [`MONITOREO.md`](MONITOREO.md)); queda observar la primera ejecución nocturna del respaldo con el latido |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
 | 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | **Hecho** el 16 de octubre de 2026 (ADR 016 y `docs/archivo/`) |
@@ -158,12 +159,34 @@ Limitación: la protección exige que el CI de la rama pase, pero el CI no se ej
 
 ### 4.5 Contrato API-cliente (fase 6)
 
-`contracts/api-contract.json` es la instantánea aceptada de 19 respuestas clave y de las listas de valores que el cliente duplica (ADR 017). El test `api-contract.e2e.test.ts` la compara con el API real en cada ejecución del CI.
+`contracts/api-contract.json` es la instantánea aceptada de 19 respuestas clave y de las listas de valores que el cliente duplica (ADR 017). El test `api-contract.e2e.test.ts` la compara con el API real en cada ejecución del CI. El cliente guarda una copia (`src/contracts/api-contract.json`) y 16 pruebas la usan.
 
-- **Cambio intencionado de una respuesta o de una lista de valores:** `UPDATE_CONTRACT=1 npm run test:e2e`, revisar el diff de `contracts/api-contract.json` en el pull request y sincronizar el cliente.
-- **Primer fruto:** el inicio de sesión devolvía campos internos (H18).
-- **Fragilidad corregida de paso:** el test de estadísticas de la bitácora comparaba cifras globales en dos llamadas y podía fallar si otra suite borraba entradas entre ambas; ahora siembra un margen amplio de eventos propios.
-- **Límites:** verifica la forma con los datos de la muestra, no el uso que hace el cliente de cada campo.
+**Qué se vigila**
+
+| Lado | Comprobación |
+|---|---|
+| API | La forma de las respuestas y las listas de valores no cambian sin aceptar el cambio a propósito. |
+| Cliente | Sus 17 estados del flujo, las transiciones, etiquetas, colores, tipos de servicio y permisos coinciden con el API. |
+| Cliente | Todo campo que los componentes leen de 10 entidades existe en la respuesta del API. |
+| Cliente | Su copia del contrato es idéntica a la del API en `main` (se omite con aviso si no hay red). |
+
+**Flujo de un cambio**
+
+1. Se cambia una respuesta o una lista de valores en el API. El CI del API falla.
+2. `UPDATE_CONTRACT=1 npm run test:e2e`, y el diff de `contracts/api-contract.json` se revisa en el pull request.
+3. Al fusionar, el CI del cliente falla en todos sus PR hasta ejecutar `npm run contract:sync` y ajustar lo que dependa del cambio.
+
+**Frutos de la fase**
+
+- **H18:** el inicio de sesión devolvía campos internos del usuario (PR #86 del API).
+- **H19:** la fecha de emisión de vouchers y cotizaciones mostraba siempre la de hoy (PR #62 del cliente).
+- Una fragilidad corregida de paso: el test de estadísticas de la bitácora comparaba cifras globales en dos llamadas y podía fallar si otra suite borraba entradas entre ambas; ahora siembra un margen amplio de eventos propios.
+
+**Límites**
+
+- Verifica la forma con los datos de la muestra, no el uso que hace el cliente de cada campo.
+- La búsqueda de campos leídos es una heurística por nombre de variable (`client.`, `quotation.`...) dentro de la carpeta de cada módulo; no cubre `pages/` ni otras variables.
+- Cada cambio intencionado del API exige un PR de sincronización en el cliente.
 
 ## 5. Cómo reproducir las mediciones
 
