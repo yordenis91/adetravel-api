@@ -72,7 +72,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H7 | Importes como `Float` | Media | ADR 008. |
 | H8 | ~~Cobertura baja en autenticación, usuarios y tareas~~ Corregido en la fase 5 | Media | Autenticación 80 %, usuarios y tareas 100 %. Plantillas de correo (30 %) y permisos (71 %) siguen bajos. |
 | H9 | Sin pruebas de contrato entre API y cliente | Media | Un cambio en una respuesta del API puede romper el cliente sin que ningún test lo avise. |
-| H10 | Monitoreo externo y `SENTRY_DSN` sin verificar | Media | Ver 2.4. |
+| H10 | Monitoreo externo sin configurar | Media | `SENTRY_DSN` está definido en producción (comprobado el 15 de octubre de 2026). Falta el monitor externo: ver [`MONITOREO.md`](MONITOREO.md). |
 | H11 | Dos mecanismos de respaldo | Baja | ADR 012: decidir cuál es el oficial. |
 | H12 | Numeración sin prueba de concurrencia | Baja | ADR 009. |
 | H13 | CI en Postgres 16, producción en 17 | Baja | Alinear. |
@@ -93,7 +93,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | **Hecho** el 15 de octubre de 2026 (ver 4.4) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
-| 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | Pendiente |
+| 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **En curso**: `SENTRY_DSN` verificado y script de respaldo con latido listo (ver [`MONITOREO.md`](MONITOREO.md)); monitores HTTP de la API y la web creados en Better Stack; faltan el latido del respaldo y aplicar `ALERT_EMAIL` en el API |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
 | 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | Pendiente |
 
