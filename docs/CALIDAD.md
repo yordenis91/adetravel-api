@@ -39,11 +39,11 @@ Archivos grandes del API con menos cobertura (cobertura combinada): tareas 11 %,
 ### 2.3 Pipeline (GitHub Actions)
 
 - Los dos repos tienen CI en `push` y `pull_request` a `main`.
-- API: Postgres 16 de servicio, `npm ci`, `prisma generate`, `migrate deploy`, `tsc`, `npm test --coverage` (incluye las e2e, porque coinciden con `*.test.ts`) y, solo en `push` y si todo pasó, llamada al *webhook* de despliegue de Easypanel.
+- API: Postgres 17 de servicio, `npm ci`, `prisma generate`, `migrate deploy`, `tsc`, `npm test --coverage` (incluye las e2e, porque coinciden con `*.test.ts`) y, solo en `push` y si todo pasó, llamada al *webhook* de despliegue de Easypanel.
 - Cliente: `npm install --legacy-peer-deps`, pruebas con cobertura, `vite build` y el mismo *webhook*.
 - Últimos 4 runs de cada repo en `main`: todos en verde.
 
-Observación: el CI usa Postgres 16 y producción corre Postgres 17 (el `Dockerfile` ya instala `pg_dump` 17 por esa razón).
+Desde la fase 9, el CI usa Postgres 17, la misma versión mayor que producción (el `Dockerfile` instala `pg_dump` 17 por esa razón).
 
 ### 2.4 Monitoreo y operación
 
@@ -53,7 +53,7 @@ Observación: el CI usa Postgres 16 y producción corre Postgres 17 (el `Dockerf
 - **Alertas:** respaldo fallido y disco bajo por correo; *heartbeat* opcional.
 - **Respaldos:** script del VPS cifrado hacia Google Drive, ensayo de restauración automatizado y procedimiento documentado.
 - **Runbook:** `OPERATIONS.md` (despliegue, vuelta atrás, migración fallida, alertas).
-- **No verificado:** que haya un monitor externo configurado sobre `/api/health`; que `SENTRY_DSN` esté definido en producción.
+- **Verificado el 16 de octubre de 2026** (ver [`MONITOREO.md`](MONITOREO.md)): `SENTRY_DSN` definido en producción y eventos visibles en Sentry; monitores HTTP de la API y la web y latido del respaldo activos en Better Stack.
 
 ### 2.5 Seguridad
 
@@ -72,10 +72,10 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H7 | Importes como `Float` | Media | ADR 008. |
 | H8 | ~~Cobertura baja en autenticación, usuarios y tareas~~ Corregido en la fase 5 | Media | Autenticación 80 %, usuarios y tareas 100 %. Plantillas de correo (30 %) y permisos (71 %) siguen bajos. |
 | H9 | Sin pruebas de contrato entre API y cliente | Media | Un cambio en una respuesta del API puede romper el cliente sin que ningún test lo avise. |
-| H10 | Monitoreo externo sin configurar | Media | `SENTRY_DSN` está definido en producción (comprobado el 15 de octubre de 2026). Falta el monitor externo: ver [`MONITOREO.md`](MONITOREO.md). |
-| H11 | Dos mecanismos de respaldo | Baja | ADR 012: decidir cuál es el oficial. |
+| H10 | ~~Monitoreo externo sin configurar~~ Corregido en la fase 7 | Media | Better Stack (HTTP y latido), Sentry y alertas por correo verificados el 16 de octubre de 2026. |
+| H11 | ~~Dos mecanismos de respaldo sin papeles definidos~~ Resuelto en la fase 9 | Baja | ADR 016: el del VPS es el oficial ante desastres; el del API, para error humano. Ambos están activos. Pendiente opcional: latido externo para el del API. |
 | H12 | Numeración sin prueba de concurrencia | Baja | ADR 009. |
-| H13 | CI en Postgres 16, producción en 17 | Baja | Alinear. |
+| H13 | ~~CI en Postgres 16, producción en 17~~ Corregido en la fase 9 | Baja | El CI usa `postgres:17`. |
 | H15 | Tipado poco estricto en el cliente | Media | `tsconfig.app.json` del cliente tiene `strictNullChecks`, `noImplicitAny` y `noUnusedLocals` desactivados (el API sí usa `strict`). `tsc` pasa, pero comprueba menos de lo que parece. Activar el modo estricto por pasos es trabajo propio. |
 | H16 | ~~Un administrador que restablece la contraseña de otro usuario no cierra sus sesiones abiertas~~ Corregido el 15 de octubre de 2026 | Media | Comprobado con una prueba desechable: tras `PATCH /api/users/:id` con `password`, la sesión anterior del usuario sigue devolviendo 200. El cambio desde el perfil y el restablecimiento por correo sí las cierran. Corregido incrementando `tokenVersion` al cambiar la contraseña; la prueba de `users-management` comprueba que la sesión anterior responde 401 `TOKEN_REVOKED`. |
 | H17 | Esquema de validación duplicado y sin uso | Baja | `src/schemas/users.schemas.ts` define otro `updateUserSchema`; las rutas usan `src/validators/users.validator.ts`. El primero induce a error. |
@@ -93,9 +93,9 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 4 | Protección de `main` (CI obligatorio, sin subida directa) | H3 | **Hecho** el 15 de octubre de 2026 (ver 4.4) |
 | 5 | Subir pruebas de autenticación, usuarios, permisos y tareas | H8 | **Hecho** el 15 de octubre de 2026 (ver 4.2); permisos queda para otra vuelta |
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
-| 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **En curso**: `SENTRY_DSN` verificado y script de respaldo con latido listo (ver [`MONITOREO.md`](MONITOREO.md)); `ALERT_EMAIL` aplicado en el API, latido del respaldo activo y monitores HTTP creados en Better Stack; falta confirmar en los paneles de Better Stack y Sentry y ver la primera ejecución nocturna |
+| 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **Hecho** el 16 de octubre de 2026 (ver [`MONITOREO.md`](MONITOREO.md)); queda observar la primera ejecución nocturna del respaldo con el latido |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
-| 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | Pendiente |
+| 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | **En curso**: Postgres 17 en el CI y ADR 016 hechos; falta ordenar los documentos sueltos (H14) |
 
 Criterio de «terminado» para decir «calidad demostrable»: fases 2 a 4 y 7 completas, con la cobertura real publicada en cada ejecución del CI y la protección de rama activa.
 

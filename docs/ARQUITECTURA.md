@@ -105,7 +105,7 @@ Reglas clave: las transiciones permitidas son una tabla explícita; el estado de
 - **Errores:** Sentry en API y cliente, con limpieza de datos sensibles antes de enviar.
 - **Salud:** `/api/health` ejecuta `SELECT 1`; el `HEALTHCHECK` del contenedor lo usa.
 - **Alertas operativas:** respaldo fallido y disco bajo por correo; latido (*heartbeat*) opcional a un monitor externo.
-- **Respaldos:** dos mecanismos. (1) Trabajo `backupDatabase` del propio API hacia un bucket S3-compatible, solo si se configuran las variables `BACKUP_S3_*`. (2) Script del VPS (`backup-dbs.sh`, cron 03:30) que vuelca **todas** las bases cifradas con una clave propia y las sube a Google Drive. Hay ensayo de restauración automatizado (`npm run restore:drill`).
+- **Respaldos:** dos copias con papeles distintos (ADR 016). (1) Trabajo `backupDatabase` del propio API (03:00) hacia un MinIO del mismo servidor, para recuperarse de un error humano o de datos corruptos. (2) Script del VPS (`backup-dbs.sh`, 03:30) que vuelca **todas** las bases, las cifra con una clave propia y las sube a Google Drive: es la copia oficial ante la pérdida del servidor, con latido externo. Hay ensayo de restauración automatizado (`npm run restore:drill`).
 - **Runbook:** [`../OPERATIONS.md`](../OPERATIONS.md): despliegue, vuelta atrás, migración fallida, alertas, réplicas.
 
 ## 9. Despliegue

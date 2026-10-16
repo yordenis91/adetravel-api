@@ -19,3 +19,4 @@ Cada decisión sigue el mismo formato: contexto, decisión, alternativas conside
 | 013 | [Despliegue en Easypanel disparado por el CI](013-despliegue-por-easypanel-tras-ci.md) | Aceptada |
 | 014 | [Correo saliente con modos `live`, `redirect` y `off`](014-correo-con-modos-de-entrega.md) | Aceptada |
 | 015 | [Tasas de cambio sincronizadas desde un servicio externo, con intervalo y enfriamiento](015-tasas-de-cambio-sincronizadas.md) | Aceptada |
+| 016 | [Dos copias de seguridad con roles distintos; la oficial para desastres es la del VPS](016-dos-copias-con-roles-distintos.md) | Aceptada (precisa el ADR 012) |
