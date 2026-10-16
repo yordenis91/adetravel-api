@@ -1,6 +1,6 @@
 # ADR 012: Respaldos de todas las bases del VPS, cifrados, hacia Google Drive
 
-Estado: Aceptada
+Estado: Aceptada (precisada por el [ADR 016](016-dos-copias-con-roles-distintos.md))
 
 ## Contexto
 
@@ -18,6 +18,6 @@ Un script del VPS (`backup-dbs.sh`, cron 03:30) vuelca cada base Postgres, la ci
 ## Consecuencias
 
 + Copia fuera del servidor y cifrada; restauración probada.
-- Dos mecanismos conviven (el del API es opcional y está apagado si faltan variables); conviene decidir cuál es el oficial.
+- Dos mecanismos conviven y ambos están activos; el ADR 016 fija sus papeles (el del VPS es el oficial para desastres).
 - La clave de cifrado del respaldo está solo en el servidor hasta guardarla en un gestor de contraseñas.
 - El Drive usado tiene 15 GiB, suficiente hoy.

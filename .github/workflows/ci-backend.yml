@@ -15,7 +15,7 @@ jobs:
     # (__tests__/payments.e2e.test.ts), que hasta ahora nunca corría en CI.
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
