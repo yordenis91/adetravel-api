@@ -15,6 +15,19 @@ import { logger } from "../utils/logger";
 import { passwordPolicyIssue } from "../utils/password-policy";
 import { escapeHtml } from "../utils/html";
 
+/**
+ * Datos del usuario que se devuelven al iniciar sesión o registrarse: los mismos que /auth/me.
+ * Lista blanca a propósito: el modelo trae el hash de la contraseña, la versión de token y el hash
+ * del enlace de invitación o recuperación pendiente, y nada de eso debe llegar al navegador.
+ */
+function publicUser(user: {
+  id: string; email: string; fullName: string; role: UserRole; agencyRole: string | null;
+  department: string | null; phone: string | null; isActive: boolean; createdAt: Date;
+}) {
+  const { id, email, fullName, role, agencyRole, department, phone, isActive, createdAt } = user;
+  return { id, email, fullName, role, agencyRole, department, phone, isActive, createdAt };
+}
+
 export async function register(req: Request, res: Response): Promise<void> {
   if (!env.ALLOW_PUBLIC_REGISTRATION) {
     throw new ApiError(
@@ -49,9 +62,8 @@ export async function register(req: Request, res: Response): Promise<void> {
 
   const token = signAccessToken(user);
 
-  const { passwordHash: _, ...userSafe } = user;
   const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
-  sendItem(res, { token, user: { ...userSafe, permissions } }, 201);
+  sendItem(res, { token, user: { ...publicUser(user), permissions } }, 201);
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
@@ -84,9 +96,8 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     const token = signAccessToken(user);
 
-    const { passwordHash, ...userSafe } = user;
     const permissions = await getEffectivePermissions(prisma, user.id, user.role, user.agencyRole);
-    sendItem(res, { token, user: { ...userSafe, permissions } });
+    sendItem(res, { token, user: { ...publicUser(user), permissions } });
   } catch (error) {
     logger.error({ err: error }, "Error en login");
     sendError(res, "Error interno del servidor", "INTERNAL_ERROR", 500);
