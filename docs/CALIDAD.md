@@ -79,7 +79,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H15 | Tipado poco estricto en el cliente | Media | `tsconfig.app.json` del cliente tiene `strictNullChecks`, `noImplicitAny` y `noUnusedLocals` desactivados (el API sí usa `strict`). `tsc` pasa, pero comprueba menos de lo que parece. Activar el modo estricto por pasos es trabajo propio. |
 | H16 | ~~Un administrador que restablece la contraseña de otro usuario no cierra sus sesiones abiertas~~ Corregido el 15 de octubre de 2026 | Media | Comprobado con una prueba desechable: tras `PATCH /api/users/:id` con `password`, la sesión anterior del usuario sigue devolviendo 200. El cambio desde el perfil y el restablecimiento por correo sí las cierran. Corregido incrementando `tokenVersion` al cambiar la contraseña; la prueba de `users-management` comprueba que la sesión anterior responde 401 `TOKEN_REVOKED`. |
 | H17 | Esquema de validación duplicado y sin uso | Baja | `src/schemas/users.schemas.ts` define otro `updateUserSchema`; las rutas usan `src/validators/users.validator.ts`. El primero induce a error. |
-| H14 | Documentos sueltos y antiguos en la raíz de los repos | Baja | Varios `.md` de trabajo (`IMPLEMENTATION_SUMMARY.md`, `EXAMPLES_AND_SCENARIOS.md`, `verify-implementation.sh`, `Notas.txt`, `.docx`) sin dueño claro; conviene ordenarlos o archivarlos. |
+| H14 | ~~Documentos sueltos y antiguos en la raíz de los repos~~ Resuelto en la fase 9 | Baja | El 16 de octubre de 2026 se borraron los informes de tareas terminadas y las notas copiadas del API que estaban en el repo del cliente; los documentos útiles pasaron a `docs/` (cliente) y `docs/archivo/` (API, marcados como no revisados). |
 
 ## 4. Plan de trabajo
 
@@ -95,7 +95,7 @@ Orden propuesto, por valor frente a un revisor y por esfuerzo. Estado al 15 de o
 | 6 | Pruebas de contrato o tipos compartidos entre API y cliente | H9 | Pendiente |
 | 7 | Monitor externo sobre `/api/health` y verificar `SENTRY_DSN` | H10 | **Hecho** el 16 de octubre de 2026 (ver [`MONITOREO.md`](MONITOREO.md)); queda observar la primera ejecución nocturna del respaldo con el latido |
 | 8 | Migrar importes a `Decimal` | H7 | Pendiente (decisión previa, ver ADR 008) |
-| 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | **En curso**: Postgres 17 en el CI y ADR 016 hechos; falta ordenar los documentos sueltos (H14) |
+| 9 | Alinear Postgres de CI (17), decidir el respaldo oficial, ordenar documentos sueltos | H11, H13, H14 | **Hecho** el 16 de octubre de 2026 (ADR 016 y `docs/archivo/`) |
 
 Criterio de «terminado» para decir «calidad demostrable»: fases 2 a 4 y 7 completas, con la cobertura real publicada en cada ejecución del CI y la protección de rama activa.
 
