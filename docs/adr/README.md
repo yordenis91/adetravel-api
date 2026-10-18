@@ -22,3 +22,4 @@ Cada decisión sigue el mismo formato: contexto, decisión, alternativas conside
 | 016 | [Dos copias de seguridad con roles distintos; la oficial para desastres es la del VPS](016-dos-copias-con-roles-distintos.md) | Aceptada (precisa el ADR 012) |
 | 017 | [Contrato API-cliente como instantánea versionada, con copia en el cliente](017-contrato-api-cliente-por-instantanea.md) | Aceptada |
 | 018 | [Correos adicionales de clientes y proveedores como lista en la propia ficha](018-correos-adicionales-como-lista-en-la-ficha.md) | Aceptada |
+| 019 | [Importación de clientes en dos pasos (vista previa y confirmación), sin pisar existentes](019-importacion-de-clientes-en-dos-pasos.md) | Aceptada |

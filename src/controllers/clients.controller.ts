@@ -5,6 +5,7 @@ import { createActivityLog } from "../services/activity-log.service";
 import { sendItem, sendList } from "../utils/response";
 import { ApiError } from "../utils/api-error";
 import { getPagination } from "../utils/pagination";
+import { importClients } from "../services/client-import.service";
 
 // ─────────────────────────────────────────────────────────────────────
 //  LISTAR CLIENTES
@@ -201,4 +202,12 @@ export async function deleteClient(req: Request, res: Response): Promise<void> {
   });
 
   sendItem(res, { ok: true, message: "Cliente eliminado correctamente" });
+}
+// ─────────────────────────────────────────────────────────────────────
+//  IMPORTAR CLIENTES (desde Excel/CSV ya leído por el cliente)
+// ─────────────────────────────────────────────────────────────────────
+export async function importClientsHandler(req: Request, res: Response): Promise<void> {
+  const { rows, dryRun } = req.body as { rows: Record<string, unknown>[]; dryRun: boolean };
+  const summary = await importClients(rows, dryRun, req.user!.id);
+  sendItem(res, summary, dryRun ? 200 : 201);
 }
