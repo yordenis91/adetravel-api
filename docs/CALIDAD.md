@@ -66,7 +66,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H1 | Cobertura del CI no representativa | Alta | Ver 2.2. Un revisor la detecta al abrir la configuración. |
 | H2 | Cobertura baja en el cliente | Alta | 27 % real. |
 | H3 | ~~`main` sin protección de rama en ambos repos~~ Corregido en la fase 4 | Alta | Se puede subir código sin pasar por el CI. El despliegue sí exige CI verde, pero el código ya está en `main`. |
-| H4 | ~~El CI no ejecuta lint ni comprobación de tipos del cliente~~ Corregido en la fase 3 | Media | `vite build` no comprueba tipos. El cliente tiene 457 avisos de ESLint (420 son `no-explicit-any`), mantenidos sin subir. |
+| H4 | ~~El CI no ejecuta lint ni comprobación de tipos del cliente~~ Corregido en la fase 3 | Media | `vite build` no comprueba tipos. El cliente tiene 451 avisos de ESLint (420 son `no-explicit-any`), mantenidos sin subir. |
 | H5 | ~~El API no tiene ESLint~~ Corregido en la fase 3 | Media | Ahora hay ESLint con línea base de avisos. |
 | H6 | ~~Sin `npm audit` ni Dependabot~~ Corregido en la fase 3 | Media | `sanitize-html` actualizado; auditoría y Dependabot en ambos repos. |
 | H7 | Importes como `Float` | Media | ADR 008. |
@@ -81,6 +81,7 @@ Cifrado de datos personales con rotación de clave ensayada, JWT con revocación
 | H17 | Esquema de validación duplicado y sin uso | Baja | `src/schemas/users.schemas.ts` define otro `updateUserSchema`; las rutas usan `src/validators/users.validator.ts`. El primero induce a error. |
 | H18 | El inicio de sesión devolvía campos internos del usuario | Media | `POST /auth/login` y `/auth/register` quitaban solo `passwordHash` y devolvían `tokenVersion`, `resetPasswordToken` y `resetPasswordExpires`. Lo destapó la revisión del contrato; corregido el 16 de octubre de 2026 (PR #86) con una lista blanca. |
 | H19 | La fecha de emisión de vouchers y cotizaciones mostraba siempre la fecha de hoy | Media | La vista previa leía `created_at`, que el API no devuelve (devuelve `createdAt`). Lo destapó la comprobación de campos del contrato; corregido el 16 de octubre de 2026 (PR #62 del cliente). Los documentos ya impresos no se corrigen. |
+| H20 | La prueba del contrato inflaba la cobertura del cliente (61,3 % mostrado frente a 26,9 % real) | Media | La prueba leía las fuentes con `import.meta.glob("?raw")`; eso hace que Vitest dé por cargados todos los archivos y deje de contar los que no tienen pruebas (el mismo engaño de la fase 2). Introducido en el PR #63, corregido el 18 de octubre de 2026 (PR #65 del cliente) leyendo con `node:fs`. Regla: las pruebas no deben importar fuentes de producción como módulos solo para inspeccionarlas. |
 | H14 | ~~Documentos sueltos y antiguos en la raíz de los repos~~ Resuelto en la fase 9 | Baja | El 16 de octubre de 2026 se borraron los informes de tareas terminadas y las notas copiadas del API que estaban en el repo del cliente; los documentos útiles pasaron a `docs/` (cliente) y `docs/archivo/` (API, marcados como no revisados). |
 
 ## 4. Plan de trabajo
@@ -106,8 +107,8 @@ Criterio de «terminado» para decir «calidad demostrable»: fases 2 a 4 y 7 co
 | Puerta | API | Cliente |
 |---|---|---|
 | Tipos | `npm run build` (`tsc` con `strict`) ya estaba | Nuevo: `npm run typecheck` en el CI |
-| Lint | Nuevo: ESLint (typescript-eslint). 0 errores, 261 avisos de línea base | Ya existía; ahora en el CI. 0 errores, 457 avisos de línea base |
-| Candado de lint | `npm run lint:ci` falla si hay más de 261 avisos | `npm run lint:ci` falla si hay más de 457 avisos |
+| Lint | Nuevo: ESLint (typescript-eslint). 0 errores, 261 avisos de línea base | Ya existía; ahora en el CI. 0 errores, 451 avisos de línea base |
+| Candado de lint | `npm run lint:ci` falla si hay más de 261 avisos | `npm run lint:ci` falla si hay más de 451 avisos |
 | Auditoría | `npm audit --omit=dev --audit-level=high`: 0 vulnerabilidades | Igual; 2 moderadas conocidas (`uuid` vía `exceljs`) |
 | Dependabot | Semanal, agrupa menores y parches; Actions mensual | Igual |
 | Node en CI | Subido de 20 a 22, como el `Dockerfile` y `.nvmrc` | Sin cambio |
