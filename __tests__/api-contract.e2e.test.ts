@@ -107,14 +107,14 @@ describe("contrato del API (integración con Postgres)", () => {
       role: "ADMINISTRADOR", agencyRole: "GERENTE", department: "Gerencia", phone: "+56 9 1111 2222",
     });
     rec.client = await make("client", {
-      firstName: `Ana${tag}`, lastName: "Contrato", email: `${tag}@cliente.cl`, phone: "+56 9 5555 0000", rut: `${tag.slice(-8)}-1`,
+      firstName: `Ana${tag}`, lastName: "Contrato", email: `${tag}@cliente.cl`, additionalEmails: ["extra@cliente.cl"], phone: "+56 9 5555 0000", rut: `${tag.slice(-8)}-1`,
       passportNumber: "P1234567", passportExpiry: "2030-01-01", passportIssueDate: "2020-01-01", passportCountry: "Chile",
       birthDate: "1990-05-05", nationality: "Chilena", address: "Calle 1", frequentFlyerNumbers: ["AA123"], restrictions: "Ninguna",
       referralSource: "Directo", bankAccount: "000111", bankName: "Banco", bankAccountHolder: "Ana", bankEmail: "ana@banco.cl", createdBy: admin.id,
     });
     rec.provider = await make("provider", {
       name: `Proveedor ${tag}`, fantasyName: "Fantasía", rut: "76.000.000-0", country: "Chile", city: "Santiago", address: "Av. 1", phone: "+56 2 2222 0000",
-      email: `${tag}@prov.cl`, businessType: "HOTEL", executiveName: "Eva", executivePhone: "+56 9 1", executiveEmail: "eva@prov.cl", contactName: "Pablo",
+      email: `${tag}@prov.cl`, additionalEmails: ["extra@prov.cl"], businessType: "HOTEL", executiveName: "Eva", executivePhone: "+56 9 1", executiveEmail: "eva@prov.cl", contactName: "Pablo",
       contactPhone: "+56 9 2", contactEmail: "pablo@prov.cl", contactRut: "1-9", bankAccount: "999", bankName: "Banco", bankAccountHolder: "Prov",
       paymentMethod: "TRANSFERENCIA", vatPercentage: 19, createdBy: admin.id,
     });

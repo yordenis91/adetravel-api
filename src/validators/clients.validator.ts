@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { partialUpdate } from "./partial-update";
+import { additionalEmailsSchema } from "./email-list";
 
 export const createClientSchema = z.object({
   firstName: z.string().min(1, "El nombre es obligatorio").max(100),
   lastName: z.string().min(1, "El apellido es obligatorio").max(100),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
+  additionalEmails: additionalEmailsSchema.default([]),
   phone: z.string().optional(),
   rut: z.string().max(20).optional(),
   passportNumber: z.string().max(30).optional(),

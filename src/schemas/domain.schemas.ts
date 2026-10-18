@@ -1,6 +1,7 @@
 import { PaymentMethod, PaymentStatus, QuotationStatus, WorkflowStatus, VoucherStatus, ServiceType } from "@prisma/client";
 import { z } from "zod";
 import { idParamSchema, paginationQuerySchema } from "./common.schemas";
+import { additionalEmailsSchema } from "../validators/email-list";
 
 export const idSchema = idParamSchema;
 
@@ -22,7 +23,7 @@ export const providersQuerySchema = paginationQuerySchema.extend({
   businessType: z.string().optional(),
   isActive: z.enum(["true", "false"]).optional()
 });
-export const providerCreateSchema = z.object({ name: z.string().min(2) }).passthrough();
+export const providerCreateSchema = z.object({ name: z.string().min(2), additionalEmails: additionalEmailsSchema.optional() }).passthrough();
 export const providerUpdateSchema = providerCreateSchema.partial();
 
 const WORKFLOW_STATUS_VALUES = Object.values(WorkflowStatus) as string[];
