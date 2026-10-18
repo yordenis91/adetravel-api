@@ -220,6 +220,9 @@
             "_count": {
               "requests": "number"
             },
+            "additionalEmails": {
+              "$array": "string"
+            },
             "address": "string",
             "bankAccount": "string",
             "bankAccountHolder": "string",
@@ -258,6 +261,9 @@
       "status": 200,
       "body": {
         "data": {
+          "additionalEmails": {
+            "$array": "string"
+          },
           "address": "string",
           "bankAccount": "string",
           "bankAccountHolder": "string",
@@ -303,6 +309,9 @@
       "body": {
         "data": {
           "$array": {
+            "additionalEmails": {
+              "$array": "string"
+            },
             "address": "string",
             "bankAccount": "string",
             "bankAccountHolder": "string",
@@ -345,6 +354,9 @@
             "budgetMin": "number",
             "cancellationReason": "string",
             "client": {
+              "additionalEmails": {
+                "$array": "string"
+              },
               "address": "string",
               "bankAccount": "string",
               "bankAccountHolder": "string",
@@ -407,6 +419,9 @@
           "budgetMin": "number",
           "cancellationReason": "string",
           "client": {
+            "additionalEmails": {
+              "$array": "string"
+            },
             "address": "string",
             "bankAccount": "string",
             "bankAccountHolder": "string",
@@ -604,6 +619,9 @@
         "data": {
           "$array": {
             "client": {
+              "additionalEmails": {
+                "$array": "string"
+              },
               "address": "string",
               "bankAccount": "string",
               "bankAccountHolder": "string",
@@ -686,6 +704,9 @@
       "body": {
         "data": {
           "client": {
+            "additionalEmails": {
+              "$array": "string"
+            },
             "address": "string",
             "bankAccount": "string",
             "bankAccountHolder": "string",

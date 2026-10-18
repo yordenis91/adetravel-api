@@ -21,3 +21,4 @@ Cada decisión sigue el mismo formato: contexto, decisión, alternativas conside
 | 015 | [Tasas de cambio sincronizadas desde un servicio externo, con intervalo y enfriamiento](015-tasas-de-cambio-sincronizadas.md) | Aceptada |
 | 016 | [Dos copias de seguridad con roles distintos; la oficial para desastres es la del VPS](016-dos-copias-con-roles-distintos.md) | Aceptada (precisa el ADR 012) |
 | 017 | [Contrato API-cliente como instantánea versionada, con copia en el cliente](017-contrato-api-cliente-por-instantanea.md) | Aceptada |
+| 018 | [Correos adicionales de clientes y proveedores como lista en la propia ficha](018-correos-adicionales-como-lista-en-la-ficha.md) | Aceptada |

@@ -121,6 +121,7 @@ model Client {
   firstName             String
   lastName              String
   email                 String?
+  additionalEmails      String[] @default([])
   phone                 String?
   rut                   String?
   passportNumber        String?
@@ -162,6 +163,7 @@ model Provider {
   address           String?
   phone             String?
   email             String?
+  additionalEmails  String[] @default([])
   businessType      String?
   executiveName     String?
   executivePhone    String?
