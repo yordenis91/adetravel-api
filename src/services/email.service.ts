@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import { decryptPII } from "../lib/pii-encryption";
+import { escapeHtml } from "../utils/html";
 
 async function resolveSmtpSettings() {
   const config = await prisma.systemConfig.findFirst();
@@ -60,22 +61,31 @@ export interface EmailAttachment {
   contentType?: string;
 }
 
+/** Resultado de un envío: `sent: false` explica por qué no salió nada (sin error, para que quien llama lo diga con honestidad). */
+export type SendEmailResult =
+  | { sent: true }
+  | { sent: false; reason: "delivery-off" | "no-smtp" };
+
 export async function sendEmail(options: {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
-}): Promise<void> {
-  const delivery = resolveDelivery(options.to, options.subject);
+}): Promise<SendEmailResult> {
+  const recipients = Array.isArray(options.to) ? options.to : [options.to];
+  const label = recipients.join(", ");
+  const delivery = resolveDelivery(label, options.subject);
   if (!delivery.send) {
-    logger.info({ to: maskEmail(options.to), mode: env.EMAIL_DELIVERY }, "Email no enviado (EMAIL_DELIVERY)");
-    return;
+    logger.info({ to: recipients.map(maskEmail), mode: env.EMAIL_DELIVERY }, "Email no enviado (EMAIL_DELIVERY)");
+    return { sent: false, reason: "delivery-off" };
   }
+  // En "live" salen a todos los destinatarios; en "redirect" resolveDelivery ya los cambió por uno solo.
+  const to = delivery.to === label ? recipients : delivery.to;
 
   const smtp = await resolveSmtpSettings();
   if (!smtp) {
     logger.warn("SMTP not configured. Email skipped.");
-    return;
+    return { sent: false, reason: "no-smtp" };
   }
 
   const transport = nodemailer.createTransport({
@@ -87,12 +97,13 @@ export async function sendEmail(options: {
 
   await transport.sendMail({
     from: smtp.from,
-    to: delivery.to,
+    to,
     subject: delivery.subject,
     html: options.html,
     ...(options.attachments?.length ? { attachments: options.attachments } : {})
   });
-  logger.info({ to: maskEmail(options.to), mode: env.EMAIL_DELIVERY }, "Email enviado");
+  logger.info({ to: recipients.map(maskEmail), mode: env.EMAIL_DELIVERY }, "Email enviado");
+  return { sent: true };
 }
 
 export async function sendTemplateEmail(options: {
@@ -108,16 +119,18 @@ export async function sendTemplateEmail(options: {
   });
 
   const variables = options.variables ?? {};
-  const interpolate = (text: string) =>
+  // Reemplazo con función: un valor con "$&" o "$1" (p. ej. un monto "$2.450.000") no debe interpretarse como patrón.
+  // En el cuerpo HTML los valores se escapan (un nombre con "<" no debe romper ni inyectar nada); en el asunto, no.
+  const interpolate = (text: string, escape: boolean) =>
     Object.entries(variables).reduce(
-      (acc, [key, value]) => acc.replace(new RegExp(`{{${key}}}`, "g"), value),
+      (acc, [key, value]) => acc.replace(new RegExp(`{{${key}}}`, "g"), () => (escape ? escapeHtml(value) : value)),
       text
     );
 
   await sendEmail({
     to: options.to,
-    subject: interpolate(template?.subject ?? options.fallbackSubject),
-    html: interpolate(template?.bodyHtml ?? options.fallbackHtml),
+    subject: interpolate(template?.subject ?? options.fallbackSubject, false),
+    html: interpolate(template?.bodyHtml ?? options.fallbackHtml, true),
     attachments: options.attachments
   });
 }

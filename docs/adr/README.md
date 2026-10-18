@@ -23,3 +23,4 @@ Cada decisión sigue el mismo formato: contexto, decisión, alternativas conside
 | 017 | [Contrato API-cliente como instantánea versionada, con copia en el cliente](017-contrato-api-cliente-por-instantanea.md) | Aceptada |
 | 018 | [Correos adicionales de clientes y proveedores como lista en la propia ficha](018-correos-adicionales-como-lista-en-la-ficha.md) | Aceptada |
 | 019 | [Importación de clientes en dos pasos (vista previa y confirmación), sin pisar existentes](019-importacion-de-clientes-en-dos-pasos.md) | Aceptada |
+| 020 | [Envío explícito de cotizaciones por correo, con mensaje editable](020-envio-explicito-de-cotizaciones-por-correo.md) | Aceptada |

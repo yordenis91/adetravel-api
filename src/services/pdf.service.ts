@@ -8,6 +8,13 @@ import { AgencyHeader, getAgencyHeader } from "./agency.service";
 import { escapeHtml } from "../utils/html";
 import { serviceTypeLabel } from "../validators/service-types";
 import { formatMoney } from "../utils/money";
+import { formatDateCL, todayISO } from "../utils/dates";
+
+/** Fecha de la cotización (la de su creación), no la del día en que se imprime. */
+function quotationDateLabel(quotation: { createdAt?: Date | string | null }): string {
+  const created = quotation.createdAt ? new Date(quotation.createdAt) : new Date();
+  return formatDateCL(todayISO(undefined, created));
+}
 
 export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
   const itemsRows = data.items.map((item: QuotationItem) => `
@@ -46,7 +53,7 @@ export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
       ${agency.rut ? `<div>RUT: ${escapeHtml(agency.rut)}</div>` : ""}
       ${agency.contact ? `<div>${escapeHtml(agency.contact)}</div>` : ""}
     </div>
-    <div style="text-align:right">Fecha: ${new Date().toLocaleDateString("es-CL")}</div>
+    <div style="text-align:right">Fecha: ${quotationDateLabel(data)}</div>
   </div>
   <div class="doc-title">Cotización de Servicios</div>
   <div class="doc-number">${escapeHtml(data.quotationNumber)}</div>
@@ -58,11 +65,14 @@ export function buildQuotationHtml(data: any, agency: AgencyHeader): string {
   </table>
   <table class="totals-table">
     <tr><td>Subtotal</td><td class="right">${data.currency} ${formatMoney(data.subtotal, data.currency)}</td></tr>
+    ${data.discount > 0 ? `<tr><td>Descuento</td><td class="right">-${data.currency} ${formatMoney(data.discount, data.currency)}</td></tr>` : ""}
     <tr><td>IVA (${data.taxPercentage}%)</td><td class="right">${data.currency} ${formatMoney(data.taxAmount, data.currency)}</td></tr>
     <tr class="total-row"><td>TOTAL</td><td class="right">${data.currency} ${formatMoney(data.total, data.currency)}</td></tr>
   </table>
   <div style="clear:both"></div>
+  ${data.validUntil ? `<p><strong>Válida hasta el ${escapeHtml(formatDateCL(data.validUntil))}</strong></p>` : ""}
   ${data.notes ? `<h4>Notas</h4><p>${escapeHtml(data.notes)}</p>` : ''}
+  ${data.termsAndConditions ? `<h4>Términos y condiciones</h4><p>${escapeHtml(data.termsAndConditions)}</p>` : ''}
 </body>
 </html>`;
 }
@@ -78,7 +88,11 @@ export async function generateQuotationPdfBuffer(quotation: any): Promise<Buffer
     taxPercentage: quotation.taxPercentage ?? 0,
     taxAmount: quotation.taxAmount ?? 0,
     total: quotation.total ?? 0,
+    discount: quotation.discount ?? 0,
+    dateLabel: quotationDateLabel(quotation),
+    validUntilLabel: quotation.validUntil ? formatDateCL(quotation.validUntil) : null,
     notes: quotation.notes,
+    termsAndConditions: quotation.termsAndConditions,
     agency: await getAgencyHeader(),
   });
   return renderToBuffer(element as never);

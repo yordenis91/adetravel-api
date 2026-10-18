@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: NAVY, color: "#fff", padding: 8, fontWeight: 700, fontSize: 12 },
   notes: { marginTop: 24 },
+  validity: { marginTop: 12, fontWeight: 700 },
   notesTitle: { fontSize: 11, fontWeight: 700, marginBottom: 4 },
 });
 
@@ -41,11 +42,18 @@ interface QuotationDocumentProps {
   taxPercentage: number;
   taxAmount: number;
   total: number;
+  /** Descuento en la moneda de la cotización (se resta del subtotal antes del IVA). */
+  discount?: number | null;
+  /** Fecha de la cotización, ya formateada (dd/mm/aaaa). */
+  dateLabel: string;
+  /** Vigencia, ya formateada (dd/mm/aaaa). */
+  validUntilLabel?: string | null;
   notes?: string | null;
+  termsAndConditions?: string | null;
   agency: AgencyHeader;
 }
 
-export function QuotationDocument({ quotationNumber, currency, clientName, items, subtotal, taxPercentage, taxAmount, total, notes, agency }: QuotationDocumentProps) {
+export function QuotationDocument({ quotationNumber, currency, clientName, items, subtotal, taxPercentage, taxAmount, total, discount, dateLabel, validUntilLabel, notes, termsAndConditions, agency }: QuotationDocumentProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -55,7 +63,7 @@ export function QuotationDocument({ quotationNumber, currency, clientName, items
             {agency.rut ? <Text>RUT: {agency.rut}</Text> : null}
             {agency.contact ? <Text>{agency.contact}</Text> : null}
           </View>
-          <Text>Fecha: {new Date().toLocaleDateString("es-CL")}</Text>
+          <Text>Fecha: {dateLabel}</Text>
         </View>
 
         <Text style={styles.docTitle}>Cotización de Servicios</Text>
@@ -86,6 +94,12 @@ export function QuotationDocument({ quotationNumber, currency, clientName, items
             <Text>Subtotal</Text>
             <Text>{currency} {formatMoney(subtotal, currency)}</Text>
           </View>
+          {discount && discount > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text>Descuento</Text>
+              <Text>-{currency} {formatMoney(discount, currency)}</Text>
+            </View>
+          ) : null}
           <View style={styles.totalsRow}>
             <Text>IVA ({taxPercentage}%)</Text>
             <Text>{currency} {formatMoney(taxAmount, currency)}</Text>
@@ -96,10 +110,19 @@ export function QuotationDocument({ quotationNumber, currency, clientName, items
           </View>
         </View>
 
+        {validUntilLabel ? <Text style={styles.validity}>Válida hasta el {validUntilLabel}</Text> : null}
+
         {notes ? (
           <View style={styles.notes}>
             <Text style={styles.notesTitle}>Notas</Text>
             <Text>{notes}</Text>
+          </View>
+        ) : null}
+
+        {termsAndConditions ? (
+          <View style={styles.notes}>
+            <Text style={styles.notesTitle}>Términos y condiciones</Text>
+            <Text>{termsAndConditions}</Text>
           </View>
         ) : null}
       </Page>
