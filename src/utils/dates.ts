@@ -8,3 +8,9 @@ export function isExpired(validUntil: string | null | undefined, timeZone?: stri
   if (!validUntil) return false;
   return validUntil < todayISO(timeZone, now);
 }
+
+/** "2026-10-30" → "30/10/2026" (formato de Chile). Devuelve el texto tal cual si no tiene forma de fecha. */
+export function formatDateCL(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso ?? "");
+}

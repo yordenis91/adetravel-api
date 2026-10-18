@@ -49,9 +49,23 @@ export const updateQuotationSchema = z.object(quotationFields).partial().refine(
 
 export const changeStatusSchema = z.object({
   status: z.enum(QUOTATION_STATUSES),
-  notes: z.string().max(500).optional()
+  notes: z.string().max(500).optional(),
+  /** false = cambiar el estado sin enviar el correo automático (p. ej. la cotización se envió por WhatsApp). */
+  sendEmail: z.boolean().default(true)
+});
+
+/** Máximo de destinatarios por envío: evita usar el sistema para difundir. */
+export const MAX_QUOTATION_RECIPIENTS = 10;
+
+/** Cuerpo de POST /quotations/:id/send: destinatarios, asunto y mensaje que la persona revisó y editó. */
+export const sendQuotationEmailSchema = z.object({
+  to: z.array(z.string().trim().email("Correo inválido").max(254)).min(1, "Indica al menos un destinatario").max(MAX_QUOTATION_RECIPIENTS, `Máximo ${MAX_QUOTATION_RECIPIENTS} destinatarios`),
+  // Sin saltos de línea: el asunto va a una cabecera del correo.
+  subject: z.string().trim().min(1, "El asunto es obligatorio").max(200).regex(/^[^\r\n]+$/, "El asunto no puede tener saltos de línea"),
+  message: z.string().trim().min(1, "El mensaje es obligatorio").max(5000, "El mensaje es demasiado largo (máximo 5000 caracteres)"),
 });
 
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;
 export type UpdateQuotationInput = z.infer<typeof updateQuotationSchema>;
+export type SendQuotationEmailInput = z.infer<typeof sendQuotationEmailSchema>;
 export type ChangeStatusInput = z.infer<typeof changeStatusSchema>;

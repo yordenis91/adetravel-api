@@ -17,6 +17,11 @@ import { escapeHtml } from "../utils/html";
 import { formatMoney } from "../utils/money";
 import { isExpired } from "../utils/dates";
 import { env } from "../config/env";
+import { sendEmail, maskEmail } from "../services/email.service";
+import {
+  buildDefaultMessage, buildDefaultSubject, buildQuotationMessageEmail, getAgencyForEmail, quotationTemplateVariables
+} from "../services/quotation-email";
+import type { SendQuotationEmailInput } from "../validators/quotations.validator";
 
 /** Cuerpo del correo cuando no hay plantilla en base: número, monto, vigencia y, si corresponde, el PDF adjunto. */
 function buildQuotationEmailHtml(
@@ -236,16 +241,19 @@ export async function changeQuotationStatus(req: Request, res: Response): Promis
   const notifyQuotationSent = config?.notifyOnQuotationSent !== false;
   const shouldSendQuotationEmail = newStatus === "ENVIADA" ? notifyQuotationSent : true;
 
-  if (existing.client.email && shouldSendQuotationEmail && ["ENVIADA", "ACEPTADA", "RECHAZADA"].includes(newStatus)) {
+  const wantsEmail = req.body.sendEmail !== false;
+  if (wantsEmail && existing.client.email && shouldSendQuotationEmail && ["ENVIADA", "ACEPTADA", "RECHAZADA"].includes(newStatus)) {
     const emailTypes: Record<string, string> = {
       "ENVIADA": "QUOTATION_SENT",
       "ACEPTADA": "QUOTATION_ACCEPTED",
       "RECHAZADA": "QUOTATION_REJECTED"
     };
     const attachments = newStatus === "ENVIADA" ? await buildQuotationAttachment(updated, existing.client) : undefined;
+    const agency = await getAgencyForEmail();
     await sendTemplateEmail({
       type: emailTypes[newStatus],
       to: existing.client.email,
+      variables: quotationTemplateVariables({ ...updated, request: null }, existing.client, agency),
       fallbackSubject: `Cotización ${existing.quotationNumber} - ${newStatus.toLowerCase()}`,
       fallbackHtml: buildQuotationEmailHtml(updated, existing.client, newStatus),
       attachments
@@ -321,4 +329,110 @@ export async function deleteQuotation(req: Request, res: Response): Promise<void
   const item = await prisma.quotation.delete({ where: { id } });
   await createActivityLog({ action: "DELETE", entityType: "Quotation", entityId: item.id, entityLabel: item.quotationNumber, performedBy: req.user?.id });
   sendItem(res, { ok: true, message: "Eliminada correctamente" });
+}
+// ─────────────────────────────────────────────────────────────────────
+//  ENVÍO POR CORREO: borrador editable y envío explícito
+// ─────────────────────────────────────────────────────────────────────
+const SENDABLE_STATUSES = ["BORRADOR", "ENVIADA"];
+
+async function loadQuotationForEmail(id: string) {
+  const quotation = await prisma.quotation.findUnique({
+    where: { id },
+    include: { client: true, request: { select: { status: true, destinationCity: true, destinationCountry: true } } },
+  });
+  if (!quotation) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
+  return quotation;
+}
+
+/** Texto inicial del correo y a quién se le puede enviar; la persona lo revisa y edita antes de enviar. */
+export async function getQuotationEmailDraft(req: Request, res: Response): Promise<void> {
+  const quotation = await loadQuotationForEmail(req.params.id as string);
+  const agency = await getAgencyForEmail();
+  const { client } = quotation;
+  sendItem(res, {
+    recipients: { primary: client.email ?? null, additional: client.additionalEmails ?? [] },
+    subject: await buildDefaultSubject(quotation, client, agency),
+    message: buildDefaultMessage(quotation, client, agency),
+    attachmentName: `${quotation.quotationNumber}.pdf`,
+    // Para avisar antes de enviar: "off" no envía nada y "redirect" desvía todo a una casilla de pruebas.
+    deliveryMode: env.EMAIL_DELIVERY,
+    status: quotation.status,
+  });
+}
+
+/**
+ * Envía la cotización (con el PDF adjunto) al correo que la persona indicó, con el asunto y mensaje que editó.
+ * Si estaba en Borrador pasa a Enviada; si ya estaba Enviada es un reenvío y el estado no cambia.
+ * Solo se cambia el estado si el correo realmente salió: nunca queda "Enviada" una cotización que no se envió.
+ */
+export async function sendQuotationByEmail(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const { to, subject, message } = req.body as SendQuotationEmailInput;
+  const existing = await loadQuotationForEmail(id);
+
+  if (!SENDABLE_STATUSES.includes(existing.status)) {
+    throw new ApiError(`Una cotización en estado ${existing.status} no se puede enviar`, 409, "QUOTATION_NOT_SENDABLE");
+  }
+  if (existing.request?.status === "CANCELADA") {
+    throw new ApiError("La solicitud está cancelada: no se puede enviar la cotización", 409, "REQUEST_CANCELLED");
+  }
+  if (env.BLOCK_EXPIRED_QUOTATIONS && isExpired(existing.validUntil)) {
+    throw new ApiError(
+      `La cotización venció el ${existing.validUntil}. Actualiza la fecha de validez antes de enviarla.`,
+      409,
+      "QUOTATION_EXPIRED"
+    );
+  }
+
+  // Sin PDF no se envía: la persona espera que el cliente reciba la cotización, no solo un mensaje.
+  let pdf: Buffer;
+  try {
+    pdf = await generateQuotationPdfBuffer({ ...existing, client: existing.client });
+  } catch (e) {
+    logger.error({ err: e, quotationId: id }, "No se pudo generar el PDF para enviar la cotización");
+    throw new ApiError("No se pudo generar el PDF de la cotización. No se envió nada.", 500, "PDF_FAILED");
+  }
+
+  const agency = await getAgencyForEmail();
+  let result;
+  try {
+    result = await sendEmail({
+      to,
+      subject,
+      html: buildQuotationMessageEmail(message, existing, agency),
+      attachments: [{ filename: `${existing.quotationNumber}.pdf`, content: pdf, contentType: "application/pdf" }],
+    });
+  } catch (e) {
+    logger.error({ err: e, quotationId: id }, "Error enviando la cotización por correo");
+    throw new ApiError("No se pudo enviar el correo. Revisa la configuración del correo (SMTP) e inténtalo de nuevo.", 502, "EMAIL_SEND_FAILED");
+  }
+  if (!result.sent) {
+    throw new ApiError(
+      result.reason === "delivery-off"
+        ? "El envío de correos está desactivado en este entorno: no se envió nada."
+        : "El correo (SMTP) no está configurado: ve a Configuración > Email. No se envió nada.",
+      409,
+      "EMAIL_NOT_SENT"
+    );
+  }
+
+  // El correo ya salió: ahora sí se pasa a Enviada (cambio atómico, como en changeQuotationStatus).
+  let statusChanged = false;
+  if (existing.status === "BORRADOR") {
+    const swapped = await prisma.quotation.updateMany({ where: { id, status: "BORRADOR" }, data: { status: "ENVIADA" } });
+    statusChanged = swapped.count > 0;
+    if (statusChanged) await advanceWorkflowStatus(existing.requestId, existing.serviceId, "ENVIADO_AL_CLIENTE");
+  }
+
+  await createActivityLog({
+    action: "UPDATE",
+    entityType: "Quotation",
+    entityId: id,
+    entityLabel: existing.quotationNumber,
+    description: `${statusChanged ? "Enviada por correo (Borrador -> Enviada)" : "Reenviada por correo"} a ${to.map(maskEmail).join(", ")}`,
+    performedBy: req.user!.id,
+  });
+
+  const quotation = await prisma.quotation.findUniqueOrThrow({ where: { id } });
+  sendItem(res, { quotation, sent: true, recipients: to.length, statusChanged });
 }
