@@ -275,11 +275,73 @@ model Quotation {
   service  Service?  @relation(fields: [serviceId], references: [id])
   client   Client    @relation(fields: [clientId], references: [id])
   payments Payment[]
+  links    QuotationLink[]
+  scheduledSends ScheduledQuotationSend[]
 
   @@index([requestId])
   @@index([clientId])
   @@index([createdAt])
   @@map("quotations")
+}
+
+/// Enlace público de una cotización (/c/<código>). El código NO se guarda: se deriva con HMAC del id
+/// (ver src/services/quotation-link.service.ts), así el agente puede volver a copiarlo y una fuga de
+/// la base no expone enlaces utilizables.
+model QuotationLink {
+  id                    String    @id @default(uuid())
+  quotationId           String
+  createdBy             String?
+  createdAt             DateTime  @default(now())
+  expiresAt             DateTime
+  revokedAt             DateTime?
+  firstViewedAt         DateTime?
+  lastViewedAt          DateTime?
+  viewCount             Int       @default(0)
+  acceptanceRequestedAt DateTime?
+
+  quotation Quotation            @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  events    QuotationLinkEvent[]
+
+  @@index([quotationId])
+  @@map("quotation_links")
+}
+
+/// Línea de tiempo de un enlace: VIEW, DOWNLOAD, ACCEPT_REQUEST, QUESTION, RENEW_REQUEST. Sin IP.
+model QuotationLinkEvent {
+  id          String   @id @default(uuid())
+  linkId      String
+  type        String
+  device      String?
+  contactName String?
+  message     String?
+  createdAt   DateTime @default(now())
+
+  link QuotationLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, createdAt])
+  @@map("quotation_link_events")
+}
+
+/// Envío de cotización programado: lo despacha un trabajo cada minuto. Vive en la base, así que un
+/// reinicio del API no lo pierde. Estados: PENDIENTE, ENVIADO, FALLIDO, CANCELADO.
+model ScheduledQuotationSend {
+  id          String    @id @default(uuid())
+  quotationId String
+  payload     Json
+  sendAt      DateTime
+  status      String    @default("PENDIENTE")
+  attempts    Int       @default(0)
+  lastError   String?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  sentAt      DateTime?
+  claimedAt   DateTime?
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([status, sendAt])
+  @@index([quotationId])
+  @@map("scheduled_quotation_sends")
 }
 
 model Confirmation {

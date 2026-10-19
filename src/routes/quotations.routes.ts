@@ -2,7 +2,8 @@ import { Router } from "express";
 import {
   createQuotation, deleteQuotation, getQuotation, listQuotations,
   updateQuotation, changeQuotationStatus, previewQuotation, downloadQuotationPdf, duplicateQuotation,
-  getQuotationEmailDraft, sendQuotationByEmail
+  getQuotationEmailDraft, sendQuotationByEmail, listScheduledSends, cancelScheduledSend,
+  getQuotationLink, ensureQuotationLink, regenerateQuotationLink, revokeQuotationLink
 } from "../controllers/quotations.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
@@ -16,12 +17,18 @@ quotationsRouter.get("/", requirePermission("VIEW_QUOTATIONS"), validate(quotati
 quotationsRouter.get("/:id", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(getQuotation));
 quotationsRouter.get("/:id/preview", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(previewQuotation));
 quotationsRouter.get("/:id/email-draft", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(getQuotationEmailDraft));
+quotationsRouter.get("/:id/link", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(getQuotationLink));
+quotationsRouter.get("/:id/scheduled", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(listScheduledSends));
 quotationsRouter.get("/:id/pdf", requirePermission("VIEW_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(downloadQuotationPdf));
 
 quotationsRouter.post("/", requirePermission("MANAGE_QUOTATIONS"), validate(createQuotationSchema), asyncHandler(createQuotation));
 quotationsRouter.post("/:id/duplicate", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(duplicateQuotation));
 quotationsRouter.patch("/:id", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), validate(updateQuotationSchema), asyncHandler(updateQuotation));
 quotationsRouter.post("/:id/send", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), validate(sendQuotationEmailSchema), asyncHandler(sendQuotationByEmail));
+quotationsRouter.post("/:id/link", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(ensureQuotationLink));
+quotationsRouter.post("/:id/link/regenerate", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(regenerateQuotationLink));
+quotationsRouter.delete("/:id/link", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), asyncHandler(revokeQuotationLink));
+quotationsRouter.delete("/:id/scheduled/:sendId", requirePermission("MANAGE_QUOTATIONS"), asyncHandler(cancelScheduledSend));
 quotationsRouter.patch("/:id/status", requirePermission("MANAGE_QUOTATIONS"), validate(idSchema, "params"), validate(changeStatusSchema), asyncHandler(changeQuotationStatus));
 
 // Eliminación estricta

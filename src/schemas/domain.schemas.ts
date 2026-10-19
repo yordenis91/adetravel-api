@@ -69,7 +69,9 @@ export const quotationsQuerySchema = paginationQuerySchema.extend({
   ).optional(),
   clientId: z.string().uuid().optional(),
   requestId: z.string().uuid().optional(),
-  search: z.string().optional()
+  search: z.string().optional(),
+  // Seguimiento del enlace en línea: enviadas sin abrir, ya abiertas, o con aceptación pedida por el cliente.
+  tracking: z.enum(["unopened", "viewed", "acceptance"]).optional()
 });
 export const quotationCreateSchema = z.object({
   requestId: z.string().uuid(),

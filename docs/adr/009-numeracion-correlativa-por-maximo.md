@@ -18,4 +18,4 @@ Solicitudes, cotizaciones, pagos, vouchers, servicios y confirmaciones llevan n�
 ## Consecuencias
 
 + Legible, con reinicio mensual, sin tablas extra.
-- Dos creaciones simultáneas en el mismo mes pueden calcular el mismo número: una falla por la restricción única y el manejador de errores responde conflicto (no hay reintento automático). No lo he visto ocurrir, y con el uso previsto es improbable, pero no hay prueba de concurrencia que lo demuestre.
+- Dos creaciones simultáneas en el mismo mes pueden calcular el mismo número: una choca con la restricción única. **Cotizaciones** ya reintenta con un número nuevo (hasta 6 veces) y tiene una prueba de concurrencia; el CI lo hizo visible el 19 de octubre de 2026 al crear muchas cotizaciones en paralelo. Las demás entidades (solicitudes, pagos, vouchers, servicios, confirmaciones) siguen sin reintento: la manejadora de errores responde conflicto (409) y hay que volver a intentar.

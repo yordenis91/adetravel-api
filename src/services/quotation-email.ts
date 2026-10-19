@@ -46,15 +46,23 @@ export function quotationTemplateVariables(q: QuotationForEmail, client: { first
   };
 }
 
-/** Texto inicial del mensaje (editable por quien envía). */
-export function buildDefaultMessage(q: QuotationForEmail, client: { firstName: string }, agency: AgencyForEmail): string {
+export type MessageVariant = "both" | "link" | "pdf";
+
+const BODY_LINE: Record<MessageVariant, string> = {
+  both: "Puedes ver el detalle en línea desde el botón de abajo; también va adjunto en PDF.",
+  link: "Puedes ver el detalle y descargar el PDF desde el botón de abajo.",
+  pdf: "Encontrarás el detalle en el PDF adjunto.",
+};
+
+/** Texto inicial del mensaje (editable por quien envía). Cambia según se envíe el enlace, el PDF o ambos. */
+export function buildDefaultMessage(q: QuotationForEmail, client: { firstName: string }, agency: AgencyForEmail, variant: MessageVariant = "both"): string {
   const total = totalLabel(q);
   const lines = [
     `Hola ${client.firstName},`,
     "",
     `Te enviamos la cotización ${q.quotationNumber}${total ? ` por un total de ${total}` : ""}.${q.validUntil ? ` Es válida hasta el ${formatDateCL(q.validUntil)}.` : ""}`,
     "",
-    "Encontrarás el detalle en el PDF adjunto. Si tienes cualquier duda o quieres ajustar algo, responde a este correo.",
+    `${BODY_LINE[variant]} Si tienes cualquier duda o quieres ajustar algo, responde a este correo.`,
     "",
     "Saludos,",
     agency.name,
@@ -83,7 +91,7 @@ export function messageToHtml(message: string): string {
 }
 
 /** Correo completo: mensaje editado por la persona + resumen de la cotización + pie de la agencia. */
-export function buildQuotationMessageEmail(message: string, q: QuotationForEmail, agency: AgencyForEmail): string {
+export function buildQuotationMessageEmail(message: string, q: QuotationForEmail, agency: AgencyForEmail, onlineUrl?: string): string {
   const total = totalLabel(q);
   const summary = [
     `<tr><td style="padding:4px 12px 4px 0;color:#64748b;">Cotización</td><td style="padding:4px 0;font-weight:bold;">${escapeHtml(q.quotationNumber)}</td></tr>`,
@@ -97,6 +105,9 @@ export function buildQuotationMessageEmail(message: string, q: QuotationForEmail
     `<div style="padding:24px;border:1px solid #e2e8f0;border-top:0;">`,
     messageToHtml(message),
     `<table style="margin:18px 0;border-collapse:collapse;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 14px;width:100%;">${summary}</table>`,
+    onlineUrl
+      ? `<p style="margin:22px 0 6px;text-align:center;"><a href="${escapeHtml(onlineUrl)}" style="display:inline-block;background:#0F1E3C;color:#ffffff;text-decoration:none;font-weight:bold;padding:13px 28px;border-radius:6px;">Ver cotización en línea</a></p><p style="margin:0 0 6px;text-align:center;font-size:12px;color:#64748b;">Si el botón no funciona, copia este enlace en tu navegador:<br><a href="${escapeHtml(onlineUrl)}" style="color:#64748b;word-break:break-all;">${escapeHtml(onlineUrl)}</a></p>`
+      : "",
     contact ? `<p style="margin:18px 0 0;font-size:12px;color:#64748b;">${contact}</p>` : "",
     `</div></div>`,
   ].join("");

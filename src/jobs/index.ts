@@ -4,6 +4,8 @@ import { logger } from "../utils/logger";
 import { runOverdueNotificationsJob } from "./overdueNotifications.job";
 import { runDatabaseBackupJob, backupsEnabled } from "./backupDatabase.job";
 import { runDiskSpaceJob } from "./diskSpace.job";
+import { runScheduledQuotationSendsJob } from "./scheduledQuotationSends.job";
+import { runQuotationRemindersJob } from "./quotationReminders.job";
 import { syncExchangeRates } from "../services/exchange-rate.service";
 import { pingBackupHeartbeat, raiseOpsAlert } from "../services/ops-alert.service";
 
@@ -27,6 +29,27 @@ export function registerJobs(): void {
     runOverdueNotificationsJob()
       .then((result) => logger.info({ result }, "[jobs] overdueNotifications ejecutado"))
       .catch((error) => logger.error({ error }, "[jobs] overdueNotifications falló"));
+  });
+
+  // Envíos de cotización programados: cada minuto despacha los que ya les toca. Viven en la base, así que
+  // un reinicio del API no los pierde (al volver se ejecutan los que quedaron pendientes).
+  let dispatching = false;
+  const dispatchScheduled = () => {
+    if (dispatching) return;
+    dispatching = true;
+    runScheduledQuotationSendsJob()
+      .then((result) => { if (result.sent || result.failed || result.retried) logger.info({ result }, "[jobs] scheduledQuotationSends ejecutado"); })
+      .catch((error) => logger.error({ err: error?.message }, "[jobs] scheduledQuotationSends falló"))
+      .finally(() => { dispatching = false; });
+  };
+  cron.schedule("* * * * *", dispatchScheduled);
+  dispatchScheduled();
+
+  // Recordatorios internos de cotizaciones (sin abrir, por vencer), una vez al día a las 9:15.
+  cron.schedule("15 9 * * *", () => {
+    runQuotationRemindersJob()
+      .then((result) => logger.info({ result }, "[jobs] quotationReminders ejecutado"))
+      .catch((error) => logger.error({ err: error?.message }, "[jobs] quotationReminders falló"));
   });
 
   // Backup de la base a S3 (ver OPERATIONS.md). Se registra solo si las

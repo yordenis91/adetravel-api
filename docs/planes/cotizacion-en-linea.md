@@ -1,6 +1,6 @@
 # Plan: cotización en línea con seguimiento
 
-**Estado:** propuesto, pendiente de 5 decisiones (del dueño y del gerente). No hay nada implementado.
+**Estado:** decisiones cerradas el 2026-10-19 e implementación en curso. Ver el ADR 021 para lo que quedó decidido.
 **Fecha:** 2026-10-19
 
 ## Para qué sirve
@@ -82,20 +82,20 @@ Una rama y un PR por fase, API antes que cliente, como hasta ahora.
 **Recomendación:** hacer las fases 1 a 4 primero, con la 5 en paralelo. Es el núcleo de lo pedido y ya da
 valor por sí solo.
 
-## Decisiones pendientes
+## Decisiones (cerradas el 2026-10-19)
 | # | Pregunta | Propuesta |
 |---|---|---|
-| 1 | Aceptar en línea: ¿el botón «Aceptar» marca la cotización como aceptada, o solo avisa al agente para que la confirme? | Solo avisar. Marcarla sola habilita los pagos. |
-| 2 | Vencimiento del enlace: ¿hasta la vigencia de la cotización o unos 30 días más? | Por decidir. |
-| 3 | PDF adjunto: ¿se sigue adjuntando junto al enlace o solo va el enlace? | Por decidir; configurable por envío sería lo flexible. |
-| 4 | Avisos de «abrió la cotización»: ¿solo quien la creó o también el gerente? | Por decidir. |
-| 5 | Recordar al cliente: ¿solo recordatorios internos o también correos automáticos al cliente? | Solo internos. |
+| 1 | Aceptar en línea: ¿marca la cotización como aceptada o solo avisa? | **Solo avisa**: crea tarea y notifica; el agente confirma. Marcarla sola habilita los pagos. Aceptación automática: solo si el uso real la justifica. |
+| 2 | Vencimiento del enlace | **30 días después de la vigencia.** Entre medias una cotización vencida muestra «vencida» (sin precios) y permite pedir una nueva. |
+| 3 | PDF adjunto | **Configurable por envío**; por defecto se adjunta junto al enlace. |
+| 4 | Avisos de apertura | **Al agente que envió.** El gerente solo recibe lo que mueve ventas: aceptación pedida y renovación de una cotización vencida. |
+| 5 | Recordar al cliente | **Solo recordatorios internos** al agente. |
 
-Si falta alguna respuesta se usa la propuesta y se registra en un ADR, como en el plan de margen.
+Cambio respecto al diseño original: el código del enlace no se guarda como hash sino que se deriva por HMAC del id, para que el agente pueda volver a copiarlo (ver ADR 021).
 
 ## Riesgos y cosas a vigilar
 - Falsos positivos de apertura por bots y previsualizadores (mitigado, no eliminado).
 - Fuga de información interna en la respuesta pública: se cubre con una prueba que compara la respuesta
   contra una lista cerrada de campos.
 - Cumplimiento de la ley chilena de datos personales: requiere revisión legal, no es solo técnico.
-- Esquema: la tabla nueva es aditiva, sin tocar datos existentes; la migración no debe bloquear el despliegue.
+- Esquema: las tablas nuevas son aditivas, sin tocar datos existentes; la migración no debe bloquear el despliegue.

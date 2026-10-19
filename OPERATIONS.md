@@ -273,6 +273,13 @@ y se puede apagar. Requiere `CURRENCY_API_KEY`; sin ella no hace nada. Con un pl
 basta acortar el intervalo desde la pantalla, sin tocar variables ni redesplegar. El último intento y el
 último error se ven en esa misma pestaña. Cada sincronización queda en el registro de actividad.
 
+## Cotización en línea (enlaces públicos)
+
+- Los enlaces que reciben los clientes se construyen con `FRONTEND_URL`: debe ser la dirección pública real del cliente web (sin barra final). Si apunta a otra dirección, los correos llevarán enlaces rotos.
+- Los códigos se derivan con `QUOTATION_LINK_SECRET` (o `JWT_SECRET` si no está). **Cambiar esa clave invalida todos los enlaces ya enviados**; por eso conviene definirla aparte de la de sesión y no rotarla sin necesidad.
+- Los envíos programados y los recordatorios los despacha el trabajo programado: la réplica con `JOBS_ENABLED=true` los ejecuta cada minuto y a las 9:15. Si se desactivan los trabajos, los envíos programados no salen.
+- Cada visita se guarda sin IP. Un enlace se anula desde la propia cotización («Regenerar» o «Revocar»).
+
 ## Lista de comprobación de salida
 
 Antes de abrir producción (fase 5), con `.env.example` como referencia de todas las variables:
