@@ -82,42 +82,58 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
     throw new ApiError("No se pueden registrar pagos en una solicitud cancelada", 409, "REQUEST_CANCELLED");
   }
 
-  // 2. Cotización: sin pagos parciales (ALLOW_PARTIAL_PAYMENTS=false, decisión asumida) el pago es por
-  // el total de una cotización aceptada; con pagos parciales basta que pertenezca a la solicitud
-  // y esté en la misma moneda.
+  // 2. Cotización + alta. Validar («¿ya hay un pago para esta cotización?») y crear van bajo un candado
+  // por solicitud: sin él, dos altas simultáneas pasan ambas la validación y se crean dos pagos. El
+  // correlativo es «máximo + 1»: si otra alta de otra solicitud toma el mismo número (P2002) se reintenta.
+  const config = await prisma.systemConfig.findFirst();
   const currency = data.currency ?? "CLP";
-  if (!env.ALLOW_PARTIAL_PAYMENTS) {
-    data.quotationId = await resolveFullPaymentQuotation({
-      requestId: data.requestId,
-      quotationId: data.quotationId,
-      amount: data.amount,
-      currency,
-    });
-  } else if (data.quotationId) {
-    const quotation = await prisma.quotation.findFirst({ where: { id: data.quotationId, requestId: data.requestId } });
-    if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
-    if (data.currency && data.currency !== quotation.currency) {
-      throw new ApiError(
-        `La moneda del pago (${data.currency}) no coincide con la de la cotización (${quotation.currency})`,
-        400,
-        "CURRENCY_MISMATCH"
-      );
+  let item;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      item = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"payment:" + data.requestId}))`;
+
+        // Sin pagos parciales (ALLOW_PARTIAL_PAYMENTS=false, decisión asumida) el pago es por el total de
+        // una cotización aceptada; con pagos parciales basta que pertenezca a la solicitud y esté en la
+        // misma moneda.
+        if (!env.ALLOW_PARTIAL_PAYMENTS) {
+          data.quotationId = await resolveFullPaymentQuotation({
+            requestId: data.requestId,
+            quotationId: data.quotationId,
+            amount: data.amount,
+            currency,
+          });
+        } else if (data.quotationId) {
+          const quotation = await tx.quotation.findFirst({ where: { id: data.quotationId, requestId: data.requestId } });
+          if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
+          if (data.currency && data.currency !== quotation.currency) {
+            throw new ApiError(
+              `La moneda del pago (${data.currency}) no coincide con la de la cotización (${quotation.currency})`,
+              400,
+              "CURRENCY_MISMATCH"
+            );
+          }
+        }
+
+        const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix || "PAG");
+        return tx.payment.create({
+          data: {
+            ...data,
+            clientId: request.clientId, // Asignación automática segura
+            status: "PENDIENTE",
+            paymentNumber,
+            createdBy: req.user!.id,
+          },
+          include: { client: true },
+        });
+      });
+      break;
+    } catch (error) {
+      const duplicateNumber = (error as { code?: string })?.code === "P2002";
+      if (!duplicateNumber || attempt >= 6) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10 + Math.floor(Math.random() * 40) * attempt));
     }
   }
-
-  const config = await prisma.systemConfig.findFirst();
-  const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix || "PAG");
-  
-  const item = await prisma.payment.create({
-    data: { 
-      ...data, 
-      clientId: request.clientId, // Asignación automática segura
-      status: "PENDIENTE", 
-      paymentNumber, 
-      createdBy: req.user!.id 
-    },
-    include: { client: true }
-  });
 
   await createActivityLog({ action: "CREATE", entityType: "Payment", entityId: item.id, entityLabel: item.paymentNumber, performedBy: req.user?.id });
   sendItem(res, item, 201);
@@ -291,4 +307,4 @@ export async function deletePayment(req: Request, res: Response): Promise<void> 
   const item = await prisma.payment.delete({ where: { id } });
   await createActivityLog({ action: "DELETE", entityType: "Payment", entityId: item.id, entityLabel: item.paymentNumber, performedBy: req.user?.id });
   sendItem(res, { ok: true, message: "Pago eliminado correctamente" });
-}
+}

@@ -207,5 +207,7 @@ describe("pagos y cotizaciones de extremo a extremo (integración con Postgres)"
     const created = results.filter((r) => r.status === 201).length;
     const vivos = await prisma.payment.count({ where: { requestId: req.id, status: { in: ["PENDIENTE", "COMPLETADO"] } } });
     expect({ created, vivos }).toEqual({ created: 1, vivos: 1 });
+    // El resto se rechaza como duplicado (409), nunca como error del servidor.
+    expect(results.filter((r) => r.status !== 201).map((r) => r.status)).toEqual(Array(9).fill(409));
   });
 });
