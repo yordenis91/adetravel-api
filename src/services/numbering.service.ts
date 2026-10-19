@@ -28,14 +28,15 @@ export function nextSequence(existingNumbers: string[], base: string): number {
   return max + 1;
 }
 
-export async function generateNumber(entity: NumberingEntity, prefix: string): Promise<string> {
+/** `db`: el cliente global o el de una transacción (para no pedir otra conexión del pool dentro de ella). */
+export async function generateNumber(entity: NumberingEntity, prefix: string, db: object = prisma): Promise<string> {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const base = `${prefix}-${year}-${month}-`;
 
   const modelKey = entity.charAt(0).toLowerCase() + entity.slice(1);
-  const model = prisma[modelKey as keyof typeof prisma];
+  const model = (db as Record<string, unknown>)[modelKey];
   if (!model || typeof model !== "object" || !("findMany" in model)) {
     throw new ApiError("Entidad de numeración no soportada", 400, "INVALID_NUMBERING_ENTITY");
   }

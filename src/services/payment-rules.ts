@@ -22,12 +22,15 @@ interface FullPaymentInput {
  *
  * Devuelve el id de la cotización a la que queda asociado el pago.
  */
-export async function resolveFullPaymentQuotation(input: FullPaymentInput): Promise<string> {
+/** Cliente de base de datos: el global o el de una transacción (así la validación usa la misma conexión que el alta). */
+type Db = Pick<typeof prisma, "quotation" | "payment">;
+
+export async function resolveFullPaymentQuotation(input: FullPaymentInput, db: Db = prisma): Promise<string> {
   const { requestId, amount, currency, excludePaymentId } = input;
 
   let quotation: { id: string; total: number | null; currency: string } | null;
   if (input.quotationId) {
-    quotation = await prisma.quotation.findFirst({
+    quotation = await db.quotation.findFirst({
       where: { id: input.quotationId, requestId },
       select: { id: true, total: true, currency: true, status: true },
     });
@@ -36,7 +39,7 @@ export async function resolveFullPaymentQuotation(input: FullPaymentInput): Prom
       throw new ApiError("Solo se puede cobrar una cotización aceptada por el cliente", 409, "QUOTATION_NOT_ACCEPTED");
     }
   } else {
-    const accepted = await prisma.quotation.findMany({
+    const accepted = await db.quotation.findMany({
       where: { requestId, status: "ACEPTADA", currency },
       select: { id: true, total: true, currency: true },
     });
@@ -70,7 +73,7 @@ export async function resolveFullPaymentQuotation(input: FullPaymentInput): Prom
     );
   }
 
-  const existing = await prisma.payment.count({
+  const existing = await db.payment.count({
     where: {
       quotationId: quotation.id,
       status: { in: ["PENDIENTE", "COMPLETADO"] },

@@ -102,7 +102,7 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
             quotationId: data.quotationId,
             amount: data.amount,
             currency,
-          });
+          }, tx);
         } else if (data.quotationId) {
           const quotation = await tx.quotation.findFirst({ where: { id: data.quotationId, requestId: data.requestId } });
           if (!quotation) throw new ApiError("La cotización no pertenece a la solicitud seleccionada", 400);
@@ -115,7 +115,7 @@ export async function createPayment(req: Request, res: Response): Promise<void> 
           }
         }
 
-        const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix || "PAG");
+        const paymentNumber = await generateNumber("Payment", config?.paymentNumberPrefix || "PAG", tx);
         return tx.payment.create({
           data: {
             ...data,
