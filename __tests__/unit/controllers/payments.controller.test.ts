@@ -239,7 +239,7 @@ describe("payments.controller", () => {
 
       await createPayment(buildReq({ body: { requestId: "req-1", amount: 119000, currency: "CLP" } } as any), createMockRes());
 
-      expect(mockResolveFullPayment).toHaveBeenCalledWith({ requestId: "req-1", quotationId: undefined, amount: 119000, currency: "CLP" });
+      expect(mockResolveFullPayment).toHaveBeenCalledWith({ requestId: "req-1", quotationId: undefined, amount: 119000, currency: "CLP" }, mockPrisma);
       expect(mockPrisma.payment.create.mock.calls[0][0].data).toMatchObject({ quotationId: "q-aceptada" });
     });
 

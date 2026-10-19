@@ -210,4 +210,15 @@ describe("pagos y cotizaciones de extremo a extremo (integración con Postgres)"
     // El resto se rechaza como duplicado (409), nunca como error del servidor.
     expect(results.filter((r) => r.status !== 201).map((r) => r.status)).toEqual(Array(9).fill(409));
   });
+
+  it("más altas simultáneas que conexiones del pool no se bloquean entre sí (una conexión por transacción)", async () => {
+    // Si la validación o el correlativo pidieran otra conexión dentro de la transacción, todas las que esperan
+    // el candado agotarían el pool, la que lo tiene no podría avanzar y caducarían todas (500).
+    const { req, quotation } = await acceptedQuotation();
+    const results = await Promise.all(
+      Array.from({ length: 40 }, () => post("/api/payments", { requestId: req.id, amount: quotation.total, method: "EFECTIVO" }))
+    );
+    const statuses = results.map((r) => r.status).sort();
+    expect(statuses).toEqual([201, ...Array(39).fill(409)]);
+  });
 });
