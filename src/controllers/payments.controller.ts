@@ -6,6 +6,8 @@ import { ApiError } from "../utils/api-error";
 import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
+import { getAgencyForEmail } from "../services/quotation-email";
+import { paymentTemplateVariables } from "../services/email-template-variables";
 import { generateNumber } from "../services/numbering.service";
 import { advanceWorkflowStatus, revertPaidRequest } from "../services/workflow.service";
 import { isRequestFullyPaid } from "../services/payment-coverage";
@@ -230,6 +232,7 @@ export async function changePaymentStatus(req: Request, res: Response): Promise<
     await sendTemplateEmail({
       type: "PAYMENT_CONFIRMED",
       to: updated.client.email,
+      variables: paymentTemplateVariables(updated, updated.client, await getAgencyForEmail()),
       fallbackSubject: `Pago ${updated.paymentNumber} confirmado`,
       fallbackHtml: `<p>Estimado/a ${updated.client.firstName}, su pago por ${updated.currency} ${updated.amount} ha sido procesado exitosamente.</p>`
     }).catch(e => logger.error({ err: e }, "Error enviando email de pago"));

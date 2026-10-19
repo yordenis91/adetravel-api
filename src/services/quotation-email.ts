@@ -11,7 +11,7 @@ interface QuotationForEmail {
   request?: { destinationCity?: string | null; destinationCountry?: string | null } | null;
 }
 
-interface AgencyForEmail {
+export interface AgencyForEmail {
   name: string;
   email?: string | null;
   phone?: string | null;
