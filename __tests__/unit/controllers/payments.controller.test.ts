@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import { createPrismaMock, createMockRes } from "../helpers/prisma-mock";
 
 const mockPrisma = createPrismaMock();
+// createPayment valida y crea dentro de una transacción con candado por solicitud: aquí la transacción ejecuta el callback con el mismo mock.
+(mockPrisma as any).$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma));
+(mockPrisma as any).$executeRaw = jest.fn().mockResolvedValue(1);
 const mockCreateActivityLog = jest.fn().mockResolvedValue(undefined);
 const mockSendTemplateEmail = jest.fn().mockResolvedValue(undefined);
 const mockGenerateNumber = jest.fn().mockResolvedValue("PAG-2026-01-0001");
