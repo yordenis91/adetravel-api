@@ -6,6 +6,7 @@ export const EMAIL_TEMPLATE_TYPES = [
   "PAYMENT_CONFIRMED",
   "VOUCHER_ISSUED",
   "REQUEST_CREATED",
+  "BIRTHDAY_GREETING",
   "CUSTOM",
 ] as const;
 
@@ -19,6 +20,7 @@ export const TEMPLATE_VARIABLES_MAP: Record<string, { name: string; description:
     { name: "currency", description: "Moneda", sample: "CLP" },
     { name: "agency_name", description: "Nombre de la agencia", sample: "ADE Travel" },
     { name: "agency_email", description: "Email de la agencia", sample: "contacto@adetravel.cl" },
+    { name: "agency_phone", description: "Teléfono de la agencia", sample: "+56 9 1234 5678" },
   ],
   "PAYMENT_CONFIRMED": [
     { name: "client_name", description: "Nombre del cliente", sample: "María González" },
@@ -42,12 +44,20 @@ export const TEMPLATE_VARIABLES_MAP: Record<string, { name: string; description:
     { name: "confirmation_code", description: "Código de confirmación", sample: "CONF-789ABC" },
     { name: "passengers", description: "Lista de pasajeros", sample: "María González, Juan González" },
     { name: "agency_name", description: "Nombre de la agencia", sample: "ADE Travel" },
+    { name: "agency_email", description: "Email de la agencia", sample: "contacto@adetravel.cl" },
   ],
   "REQUEST_CREATED": [
     { name: "client_name", description: "Nombre del cliente", sample: "María González" },
     { name: "request_number", description: "Número de solicitud", sample: "ADET-2024-05-0001" },
     { name: "destination", description: "Destino del viaje", sample: "Santiago → París" },
     { name: "request_date", description: "Fecha de la solicitud", sample: "10 de mayo, 2024" },
+    { name: "agency_name", description: "Nombre de la agencia", sample: "ADE Travel" },
+    { name: "agency_email", description: "Email de la agencia", sample: "contacto@adetravel.cl" },
+  ],
+  "BIRTHDAY_GREETING": [
+    { name: "client_name", description: "Nombre del cliente", sample: "María" },
+    { name: "client_full_name", description: "Nombre y apellido del cliente", sample: "María González" },
+    { name: "message", description: "Texto del saludo (el agente puede editarlo antes de enviar)", sample: "Queremos desearte un día maravilloso, rodeado de tus seres queridos." },
     { name: "agency_name", description: "Nombre de la agencia", sample: "ADE Travel" },
     { name: "agency_email", description: "Email de la agencia", sample: "contacto@adetravel.cl" },
   ],

@@ -9,6 +9,8 @@ import { generateNumber } from "../services/numbering.service";
 import { syncServicesOnRequestStatusChange } from "../services/workflow.service";
 import { VALID_TRANSITIONS } from "../validators/requests.validator";
 import { sendTemplateEmail } from "../services/email.service";
+import { getAgencyForEmail } from "../services/quotation-email";
+import { requestTemplateVariables } from "../services/email-template-variables";
 import { logger } from "../utils/logger";
 
 export async function listRequests(req: Request, res: Response): Promise<void> {
@@ -107,9 +109,11 @@ export async function createRequest(req: Request, res: Response): Promise<void> 
 
   // Notificación interna al correo de la agencia (switch "Nueva solicitud" de Configuración > Email)
   if (config?.notifyOnRequestCreated && config.agencyEmail) {
+    const client = await prisma.client.findUnique({ where: { id: item.clientId }, select: { firstName: true, lastName: true } });
     await sendTemplateEmail({
       type: "REQUEST_CREATED",
       to: config.agencyEmail,
+      variables: requestTemplateVariables(item, client ?? { firstName: "" }, await getAgencyForEmail()),
       fallbackSubject: `Nueva solicitud: ${item.requestNumber}`,
       fallbackHtml: `<p>Se ha registrado una nueva solicitud con el número <strong>${item.requestNumber}</strong>.</p>`
     }).catch(e => logger.error({ err: e }, "Error enviando notificación de nueva solicitud"));

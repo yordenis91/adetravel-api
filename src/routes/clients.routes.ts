@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { createClient, deleteClient, getClient, listClients, updateClient, toggleClientActive, importClientsHandler } from "../controllers/clients.controller";
-import { sendBirthdayEmails } from "../controllers/birthday.controller";
+import { previewBirthdayEmail, sendBirthdayEmails } from "../controllers/birthday.controller";
 import { asyncHandler } from "../utils/async-handler";
 import { validate } from "../middlewares/validation.middleware";
 import { clientsQuerySchema, idSchema } from "../schemas/domain.schemas";
 // 🔥 CAMBIO: Usamos nuestro nuevo guardia de permisos
 import { requirePermission } from "../middlewares/permission.middleware";
-import { createClientSchema, updateClientSchema } from "../validators/clients.validator";
+import { birthdayPreviewSchema, createClientSchema, sendBirthdaySchema, updateClientSchema } from "../validators/clients.validator";
 import { importClientsSchema } from "../validators/client-import.validator";
 
 export const clientsRouter = Router();
@@ -26,4 +26,5 @@ clientsRouter.patch("/:id/toggle", requirePermission("CREATE_CLIENT"), validate(
 clientsRouter.delete("/:id", requirePermission("DELETE_CLIENT"), validate(idSchema, "params"), asyncHandler(deleteClient));
 
 // Envío de felicitaciones de cumpleaños (individual o masivo)
-clientsRouter.post("/birthday", requirePermission("SEND_BIRTHDAY_EMAILS"), asyncHandler(sendBirthdayEmails));
+clientsRouter.post("/birthday/preview", requirePermission("SEND_BIRTHDAY_EMAILS"), validate(birthdayPreviewSchema), asyncHandler(previewBirthdayEmail));
+clientsRouter.post("/birthday", requirePermission("SEND_BIRTHDAY_EMAILS"), validate(sendBirthdaySchema), asyncHandler(sendBirthdayEmails));

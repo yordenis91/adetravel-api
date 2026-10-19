@@ -397,7 +397,11 @@ describe("payments.controller", () => {
         data: { status: "COMPLETADO" },
       });
       expect(mockSendTemplateEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "PAYMENT_CONFIRMED", to: "cliente@example.com" })
+        expect.objectContaining({
+          type: "PAYMENT_CONFIRMED",
+          to: "cliente@example.com",
+          variables: expect.objectContaining({ client_name: "Ana", payment_number: "PAG-1", amount: "500", currency: "CLP" }),
+        })
       );
       expect(mockPrisma.notification.create).toHaveBeenCalledWith(
         expect.objectContaining({

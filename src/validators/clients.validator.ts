@@ -30,3 +30,13 @@ export const updateClientSchema = partialUpdate(createClientSchema);
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;
+export const birthdayPreviewSchema = z.object({
+  clientId: z.string().uuid(),
+  message: z.string().trim().max(2000).optional(),
+});
+
+export const sendBirthdaySchema = z.object({
+  clientIds: z.array(z.string().uuid()).min(1, "Elige al menos un cliente").max(200),
+  /** Saludo editado por cliente (id → texto); sin entrada se usa el de la plantilla. */
+  messages: z.record(z.string().uuid(), z.string().trim().max(2000)).optional(),
+});

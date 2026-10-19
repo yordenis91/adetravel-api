@@ -6,6 +6,8 @@ import { ApiError } from "../utils/api-error";
 import { getPagination } from "../utils/pagination";
 import { createActivityLog } from "../services/activity-log.service";
 import { sendTemplateEmail } from "../services/email.service";
+import { getAgencyForEmail } from "../services/quotation-email";
+import { voucherTemplateVariables } from "../services/email-template-variables";
 import { generateNumber } from "../services/numbering.service";
 import { generateVoucherPdfBuffer } from "../services/pdf.service";
 import { VALID_TRANSITIONS } from "../validators/vouchers.validator";
@@ -190,6 +192,7 @@ export async function changeVoucherStatus(req: Request, res: Response): Promise<
     await sendTemplateEmail({
       type: "VOUCHER_ISSUED",
       to: updated.client.email,
+      variables: voucherTemplateVariables(updated, updated.client, await getAgencyForEmail()),
       fallbackSubject: `Voucher de Servicio Confirmado: ${updated.voucherNumber}`,
       fallbackHtml: `<p>Estimado/a ${updated.client.firstName}, su servicio <strong>${updated.serviceName}</strong> ha sido confirmado con el código <strong>${updated.confirmationCode || 'Pendiente'}</strong>.</p>`
     }).catch(e => logger.error({ err: e }, "Error enviando email de voucher"));

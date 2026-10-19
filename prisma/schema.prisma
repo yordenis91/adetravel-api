@@ -570,7 +570,7 @@ model SystemConfig {
 model EmailTemplate {
   id          String   @id @default(uuid())
   name        String
-  type        String // QUOTATION_SENT | PAYMENT_CONFIRMED | VOUCHER_ISSUED | REQUEST_CREATED | CUSTOM
+  type        String // QUOTATION_SENT | PAYMENT_CONFIRMED | VOUCHER_ISSUED | REQUEST_CREATED | BIRTHDAY_GREETING | CUSTOM
   subject     String
   bodyHtml    String
   isActive    Boolean  @default(true)

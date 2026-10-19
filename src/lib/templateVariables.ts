@@ -1,8 +1,9 @@
 export const TEMPLATE_TYPES = [
-  { value: "QUOTATION_SENT", label: "Cotización Enviada", color: "purple" },
+  { value: "QUOTATION_SENT", label: "Cotización enviada (mensaje sugerido)", color: "purple" },
   { value: "PAYMENT_CONFIRMED", label: "Pago Confirmado", color: "green" },
   { value: "VOUCHER_ISSUED", label: "Voucher Emitido", color: "navy" },
   { value: "REQUEST_CREATED", label: "Solicitud Creada", color: "amber" },
+  { value: "BIRTHDAY_GREETING", label: "Felicitación de cumpleaños", color: "pink" },
   { value: "CUSTOM", label: "Personalizado", color: "gray" },
 ];
 

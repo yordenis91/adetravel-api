@@ -115,31 +115,40 @@ export async function sendEmail(options: {
   return { sent: true };
 }
 
-export async function sendTemplateEmail(options: {
+/**
+ * Rellena `{{variable}}` en un texto. En HTML los valores se escapan (un nombre con "<" no debe romper ni inyectar
+ * nada) salvo los de `htmlVariables`, que ya son HTML seguro armado por el sistema; en el asunto, no se escapa.
+ * Reemplazo con función: un valor con "$&" o "$1" (p. ej. un monto "$2.450.000") no debe interpretarse como patrón.
+ * Toda etiqueta que quede sin valor se elimina: nunca debe llegar un "{{client_name}}" literal a una persona.
+ */
+export function fillTemplate(text: string, variables: Record<string, string>, mode: "text" | "html", htmlVariables: Record<string, string> = {}): string {
+  const replace = (acc: string, key: string, value: string) => acc.replace(new RegExp(`{{${key}}}`, "g"), () => value);
+  let out = Object.entries(variables).reduce((acc, [key, value]) => replace(acc, key, mode === "html" ? escapeHtml(value) : value), text);
+  if (mode === "html") out = Object.entries(htmlVariables).reduce((acc, [key, value]) => replace(acc, key, value), out);
+  return out.replace(/\{\{\s*\w+\s*\}\}/g, "");
+}
+
+export interface TemplateEmailOptions {
   type: string;
-  to: string;
   variables?: Record<string, string>;
+  /** Variables cuyo valor ya es HTML seguro (p. ej. un mensaje con párrafos); solo se usan en el cuerpo. */
+  htmlVariables?: Record<string, string>;
   fallbackSubject: string;
   fallbackHtml: string;
-  attachments?: EmailAttachment[];
-}): Promise<void> {
-  const template = await prisma.emailTemplate.findFirst({
-    where: { type: options.type, isActive: true }
-  });
+}
 
+/** Asunto y cuerpo finales: la plantilla activa del tipo (o el texto de respaldo) con sus variables rellenas. */
+export async function renderTemplateEmail(options: TemplateEmailOptions): Promise<{ subject: string; html: string; fromTemplate: boolean }> {
+  const template = await prisma.emailTemplate.findFirst({ where: { type: options.type, isActive: true } });
   const variables = options.variables ?? {};
-  // Reemplazo con función: un valor con "$&" o "$1" (p. ej. un monto "$2.450.000") no debe interpretarse como patrón.
-  // En el cuerpo HTML los valores se escapan (un nombre con "<" no debe romper ni inyectar nada); en el asunto, no.
-  const interpolate = (text: string, escape: boolean) =>
-    Object.entries(variables).reduce(
-      (acc, [key, value]) => acc.replace(new RegExp(`{{${key}}}`, "g"), () => (escape ? escapeHtml(value) : value)),
-      text
-    );
+  return {
+    subject: fillTemplate(template?.subject ?? options.fallbackSubject, variables, "text").replace(/[\r\n]+/g, " ").trim(),
+    html: fillTemplate(template?.bodyHtml ?? options.fallbackHtml, variables, "html", options.htmlVariables),
+    fromTemplate: Boolean(template),
+  };
+}
 
-  await sendEmail({
-    to: options.to,
-    subject: interpolate(template?.subject ?? options.fallbackSubject, false),
-    html: interpolate(template?.bodyHtml ?? options.fallbackHtml, true),
-    attachments: options.attachments
-  });
+export async function sendTemplateEmail(options: TemplateEmailOptions & { to: string; attachments?: EmailAttachment[] }): Promise<SendEmailResult> {
+  const { subject, html } = await renderTemplateEmail(options);
+  return sendEmail({ to: options.to, subject, html, attachments: options.attachments });
 }
