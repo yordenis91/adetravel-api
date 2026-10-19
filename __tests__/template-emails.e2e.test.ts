@@ -74,7 +74,12 @@ describe("correos automáticos con plantilla (integración con Postgres)", () =>
       savedConfig = { id: config.id, data: { notifyOnRequestCreated: config.notifyOnRequestCreated, agencyEmail: config.agencyEmail, agencyName: config.agencyName, agencyFantasyName: config.agencyFantasyName } };
       await prisma.systemConfig.update({ where: { id: config.id }, data: { notifyOnRequestCreated: true, agencyEmail: `${tag}-agencia@example.com`, agencyName: "Agencia Prueba", agencyFantasyName: null } });
     } else {
-      configCreatedId = (await prisma.systemConfig.create({ data: { notifyOnRequestCreated: true, agencyEmail: `${tag}-agencia@example.com`, agencyName: "Agencia Prueba" } })).id;
+      configCreatedId = (await prisma.systemConfig.create({ data: {
+        // Sin configuración guardada, el código trata los avisos como activos (`!== false`); el valor por defecto de la
+        // columna es false, y otras suites que corren a la vez no deben verlo apagado.
+        notifyOnRequestCreated: true, notifyOnQuotationSent: true, notifyOnPaymentCompleted: true, notifyOnVoucherIssued: true,
+        agencyEmail: `${tag}-agencia@example.com`, agencyName: "Agencia Prueba",
+      } })).id;
     }
   });
 
