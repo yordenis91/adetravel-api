@@ -507,6 +507,28 @@ describe("cotización en línea (integración con Postgres)", () => {
     });
   });
 
+  describe("creación simultánea de cotizaciones", () => {
+    it("varias altas a la vez no fallan por un correlativo repetido: se reintenta y cada una queda con su número", async () => {
+      const requests = await Promise.all(
+        Array.from({ length: 8 }, (_, i) =>
+          prisma.request.create({ data: { requestNumber: `${tag}-C${i}`, clientId: client.id, isPackage: true, createdBy: agent.id } })
+        )
+      );
+      requestIds.push(...requests.map((r: { id: string }) => r.id));
+      const results = await Promise.all(
+        requests.map((r: { id: string }) =>
+          request(app).post("/api/quotations").set(auth()).send({
+            requestId: r.id, clientId: client.id, currency: "CLP", taxPercentage: 19, discount: 0, validUntil: "2099-12-31",
+            items: [{ service: "Hotel", description: "", quantity: 1, unitPrice: 1000, total: 0 }],
+          })
+        )
+      );
+      expect(results.map((r: { status: number }) => r.status)).toEqual(Array(8).fill(201));
+      const numbers = results.map((r: { body: { data: { quotationNumber: string } } }) => r.body.data.quotationNumber);
+      expect(new Set(numbers).size).toBe(8);
+    });
+  });
+
   describe("vencimiento del enlace", () => {
     it("vence 30 días después de la vigencia de la cotización", async () => {
       const { q } = await sentQuotation({ validUntil: "2030-06-15" });

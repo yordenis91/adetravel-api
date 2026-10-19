@@ -101,6 +101,9 @@ export async function getQuotation(req: Request, res: Response): Promise<void> {
   sendItem(res, withTracking(item));
 }
 
+/** Intentos de crear una cotización cuando el correlativo calculado ya lo tomó otra creación simultánea. */
+const MAX_NUMBER_ATTEMPTS = 6;
+
 export async function createQuotation(req: Request, res: Response): Promise<void> {
   const data = req.body;
 
@@ -125,7 +128,6 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   }
 
   const config = await prisma.systemConfig.findFirst();
-  const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix || "COTIZ");
 
   // 2. Establecer validez y notas por defecto si no vienen (Regla Buildy)
   let validUntil = data.validUntil;
@@ -139,19 +141,32 @@ export async function createQuotation(req: Request, res: Response): Promise<void
   const normalizedItems = normalizeItems(data.items, data.currency);
   const totals = calculateTotals(normalizedItems, data.taxPercentage || 0, data.discount || 0, data.currency);
 
-  const item = await prisma.quotation.create({
-    data: { 
-      ...data, 
-      ...totals,
-      validUntil,
-      status: "BORRADOR",
-      items: normalizedItems as any,
-      notes: data.notes ?? config?.defaultQuotationNotes ?? "",
-      termsAndConditions: data.termsAndConditions ?? config?.defaultTermsAndConditions ?? "",
-      quotationNumber, 
-      createdBy: req.user!.id 
+  // El correlativo es «máximo + 1» (ADR 009): dos altas simultáneas pueden calcular el mismo número y una choca con la
+  // restricción única. Se reintenta con un número nuevo en vez de devolver un error al usuario.
+  let item;
+  for (let attempt = 1; ; attempt++) {
+    const quotationNumber = await generateNumber("Quotation", config?.quotationNumberPrefix || "COTIZ");
+    try {
+      item = await prisma.quotation.create({
+        data: {
+          ...data,
+          ...totals,
+          validUntil,
+          status: "BORRADOR",
+          items: normalizedItems as any,
+          notes: data.notes ?? config?.defaultQuotationNotes ?? "",
+          termsAndConditions: data.termsAndConditions ?? config?.defaultTermsAndConditions ?? "",
+          quotationNumber,
+          createdBy: req.user!.id
+        }
+      });
+      break;
+    } catch (error) {
+      const duplicateNumber = (error as { code?: string })?.code === "P2002";
+      if (!duplicateNumber || attempt >= MAX_NUMBER_ATTEMPTS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10 + Math.floor(Math.random() * 40) * attempt));
     }
-  });
+  }
 
   // 4. Sincronización automática: crear la cotización final representa la sección 4.7
   // ("Crear oferta final") del documento -> avanza el Servicio/Solicitud a COTIZADO_POR_ADETRAVEL
