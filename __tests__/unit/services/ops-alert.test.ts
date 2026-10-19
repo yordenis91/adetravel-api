@@ -9,6 +9,9 @@ jest.mock("@sentry/node", () => ({ captureMessage: mockCaptureMessage, captureEx
 const mockSendEmail = jest.fn().mockResolvedValue(undefined);
 jest.mock("../../../src/services/email.service", () => ({ sendEmail: mockSendEmail }));
 const mockSchedule = jest.fn();
+// Los trabajos de cotizaciones arrastran el generador de PDF (solo ESM) y tocarían la base al registrarse.
+jest.mock("../../../src/jobs/scheduledQuotationSends.job", () => ({ runScheduledQuotationSendsJob: jest.fn().mockResolvedValue({ sent: 0, failed: 0, retried: 0 }) }));
+jest.mock("../../../src/jobs/quotationReminders.job", () => ({ runQuotationRemindersJob: jest.fn().mockResolvedValue({ unopened: 0, expiring: 0 }) }));
 jest.mock("node-cron", () => ({ __esModule: true, default: { schedule: mockSchedule }, schedule: mockSchedule }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -70,6 +73,10 @@ describe("registro de trabajos programados", () => {
 
     delete process.env.JOBS_ENABLED;
     jest.isolateModules(() => require("../../../src/jobs").registerJobs());
-    expect(mockSchedule.mock.calls.map(([expr]: [string]) => expr)).toContain("*/30 * * * *");
+    const expressions = mockSchedule.mock.calls.map(([expr]: [string]) => expr);
+    expect(expressions).toContain("*/30 * * * *");
+    // Envíos de cotización programados (cada minuto) y recordatorios internos (9:15).
+    expect(expressions).toContain("* * * * *");
+    expect(expressions).toContain("15 9 * * *");
   });
 });

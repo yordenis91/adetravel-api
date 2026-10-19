@@ -57,12 +57,33 @@ export const changeStatusSchema = z.object({
 /** Máximo de destinatarios por envío: evita usar el sistema para difundir. */
 export const MAX_QUOTATION_RECIPIENTS = 10;
 
+export const MAX_SCHEDULE_DAYS = 90;
+const emailList = (max: number, message: string) =>
+  z.array(z.string().trim().email("Correo inválido").max(254)).max(max, message);
+
 /** Cuerpo de POST /quotations/:id/send: destinatarios, asunto y mensaje que la persona revisó y editó. */
 export const sendQuotationEmailSchema = z.object({
   to: z.array(z.string().trim().email("Correo inválido").max(254)).min(1, "Indica al menos un destinatario").max(MAX_QUOTATION_RECIPIENTS, `Máximo ${MAX_QUOTATION_RECIPIENTS} destinatarios`),
+  cc: emailList(MAX_QUOTATION_RECIPIENTS, `Máximo ${MAX_QUOTATION_RECIPIENTS} correos en copia`).default([]),
+  bcc: emailList(MAX_QUOTATION_RECIPIENTS, `Máximo ${MAX_QUOTATION_RECIPIENTS} correos en copia oculta`).default([]),
   // Sin saltos de línea: el asunto va a una cabecera del correo.
   subject: z.string().trim().min(1, "El asunto es obligatorio").max(200).regex(/^[^\r\n]+$/, "El asunto no puede tener saltos de línea"),
   message: z.string().trim().min(1, "El mensaje es obligatorio").max(5000, "El mensaje es demasiado largo (máximo 5000 caracteres)"),
+  /** Adjuntar el PDF al correo. */
+  attachPdf: z.boolean().default(true),
+  /** Incluir el botón con el enlace a la cotización en línea (permite saber si la abrió). */
+  includeLink: z.boolean().default(true),
+  /** Si viene, el correo no sale ahora: se envía a esa hora (ISO 8601). */
+  scheduledAt: z.string().datetime({ offset: true }).optional(),
+}).superRefine((v, ctx) => {
+  if (!v.attachPdf && !v.includeLink) {
+    ctx.addIssue({ code: "custom", path: ["attachPdf"], message: "Incluye el enlace en línea, el PDF adjunto o ambos: si no, el cliente no recibe la cotización." });
+  }
+  if (v.scheduledAt) {
+    const at = new Date(v.scheduledAt).getTime();
+    if (at < Date.now() + 60_000) ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "La fecha de envío programado debe ser futura" });
+    if (at > Date.now() + MAX_SCHEDULE_DAYS * 86_400_000) ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: `Solo se puede programar hasta ${MAX_SCHEDULE_DAYS} días hacia adelante` });
+  }
 });
 
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;

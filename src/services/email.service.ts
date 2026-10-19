@@ -68,6 +68,11 @@ export type SendEmailResult =
 
 export async function sendEmail(options: {
   to: string | string[];
+  /** Copia visible y copia oculta. En modo "redirect" se omiten: la salvaguarda manda todo a una sola casilla de pruebas. */
+  cc?: string[];
+  bcc?: string[];
+  /** Dirección a la que llegan las respuestas del cliente (p. ej. el agente que envió la cotización). */
+  replyTo?: string;
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
@@ -80,7 +85,8 @@ export async function sendEmail(options: {
     return { sent: false, reason: "delivery-off" };
   }
   // En "live" salen a todos los destinatarios; en "redirect" resolveDelivery ya los cambió por uno solo.
-  const to = delivery.to === label ? recipients : delivery.to;
+  const redirected = delivery.to !== label;
+  const to = redirected ? delivery.to : recipients;
 
   const smtp = await resolveSmtpSettings();
   if (!smtp) {
@@ -100,6 +106,9 @@ export async function sendEmail(options: {
     to,
     subject: delivery.subject,
     html: options.html,
+    ...(!redirected && options.cc?.length ? { cc: options.cc } : {}),
+    ...(!redirected && options.bcc?.length ? { bcc: options.bcc } : {}),
+    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
     ...(options.attachments?.length ? { attachments: options.attachments } : {})
   });
   logger.info({ to: recipients.map(maskEmail), mode: env.EMAIL_DELIVERY }, "Email enviado");

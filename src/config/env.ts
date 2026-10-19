@@ -7,6 +7,13 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().default("1d"),
   FRONTEND_URL: z.string().url().default("http://localhost:8080"),
+  // Clave con la que se derivan los códigos de los enlaces públicos de cotización (HMAC). Si falta se usa JWT_SECRET;
+  // definirla aparte permite rotar la sesión sin invalidar los enlaces ya enviados a clientes.
+  QUOTATION_LINK_SECRET: z.string().min(16).optional(),
+  // Límites por IP (ventana de 15 min la lectura y el PDF, 1 hora la escritura) de las páginas públicas de cotización.
+  PUBLIC_READ_RATE_LIMIT_MAX: z.coerce.number().default(120),
+  PUBLIC_PDF_RATE_LIMIT_MAX: z.coerce.number().default(20),
+  PUBLIC_WRITE_RATE_LIMIT_MAX: z.coerce.number().default(20),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),

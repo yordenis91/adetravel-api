@@ -17,11 +17,12 @@ import { escapeHtml } from "../utils/html";
 import { formatMoney } from "../utils/money";
 import { isExpired } from "../utils/dates";
 import { env } from "../config/env";
-import { sendEmail, maskEmail } from "../services/email.service";
 import {
-  buildDefaultMessage, buildDefaultSubject, buildQuotationMessageEmail, getAgencyForEmail, quotationTemplateVariables
+  buildDefaultMessage, buildDefaultSubject, getAgencyForEmail, quotationTemplateVariables
 } from "../services/quotation-email";
 import type { SendQuotationEmailInput } from "../validators/quotations.validator";
+import { assertQuotationSendable, loadQuotationForEmail, sendQuotationNow } from "../services/quotation-send.service";
+import { buildLinkUrl, findActiveLink, getOrCreateActiveLink, regenerateLink, revokeLinks, summarizeTracking } from "../services/quotation-link.service";
 
 /** Cuerpo del correo cuando no hay plantilla en base: número, monto, vigencia y, si corresponde, el PDF adjunto. */
 function buildQuotationEmailHtml(
@@ -54,6 +55,26 @@ async function buildQuotationAttachment(quotation: any, client: any) {
   }
 }
 
+/** Enlaces vigentes de la cotización (para el resumen de seguimiento de la lista y el detalle). */
+const activeLinksInclude = () => ({
+  where: { revokedAt: null, expiresAt: { gt: new Date() } },
+  select: { createdAt: true, expiresAt: true, revokedAt: true, viewCount: true, firstViewedAt: true, lastViewedAt: true, acceptanceRequestedAt: true },
+});
+
+function withTracking<T extends { links: Parameters<typeof summarizeTracking>[0] }>(row: T) {
+  const { links, ...rest } = row;
+  return { ...rest, tracking: summarizeTracking(links) };
+}
+
+/** Filtro «enviadas sin abrir» / «abiertas» / «pidieron aceptar»: solo cuentan las que tienen un enlace vigente. */
+function trackingFilter(value: string | undefined) {
+  const live = { revokedAt: null, expiresAt: { gt: new Date() } };
+  if (value === "unopened") return { status: "ENVIADA" as const, links: { some: { ...live, viewCount: 0 } } };
+  if (value === "viewed") return { links: { some: { ...live, viewCount: { gt: 0 } } } };
+  if (value === "acceptance") return { status: "ENVIADA" as const, links: { some: { ...live, acceptanceRequestedAt: { not: null } } } };
+  return {};
+}
+
 export async function listQuotations(req: Request, res: Response): Promise<void> {
   const { page, limit, skip } = getPagination(req.query);
   const statusRaw = req.query.status as string | undefined;
@@ -63,20 +84,21 @@ export async function listQuotations(req: Request, res: Response): Promise<void>
     ...(status ? { status: status as never } : {}),
     ...(req.query.clientId ? { clientId: req.query.clientId as string } : {}),
     ...(req.query.requestId ? { requestId: req.query.requestId as string } : {}),
-    ...(req.query.search ? { id: { in: await idsMatchingSearch("quotations", req.query.search as string) } } : {})
+    ...(req.query.search ? { id: { in: await idsMatchingSearch("quotations", req.query.search as string) } } : {}),
+    ...trackingFilter(req.query.tracking as string | undefined)
   };
 
-  const [data, total] = await Promise.all([
-    prisma.quotation.findMany({ where, include: { client: true, request: true }, skip, take: limit, orderBy: { createdAt: "desc" } }),
+  const [rows, total] = await Promise.all([
+    prisma.quotation.findMany({ where, include: { client: true, request: true, links: activeLinksInclude() }, skip, take: limit, orderBy: { createdAt: "desc" } }),
     prisma.quotation.count({ where })
   ]);
-  sendList(res, data, total, page, limit);
+  sendList(res, rows.map(withTracking), total, page, limit);
 }
 
 export async function getQuotation(req: Request, res: Response): Promise<void> {
-  const item = await prisma.quotation.findUnique({ where: { id: String(req.params.id) }, include: { request: true, client: true } });
+  const item = await prisma.quotation.findUnique({ where: { id: String(req.params.id) }, include: { request: true, client: true, links: activeLinksInclude() } });
   if (!item) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
-  sendItem(res, item);
+  sendItem(res, withTracking(item));
 }
 
 export async function createQuotation(req: Request, res: Response): Promise<void> {
@@ -333,27 +355,27 @@ export async function deleteQuotation(req: Request, res: Response): Promise<void
 // ─────────────────────────────────────────────────────────────────────
 //  ENVÍO POR CORREO: borrador editable y envío explícito
 // ─────────────────────────────────────────────────────────────────────
-const SENDABLE_STATUSES = ["BORRADOR", "ENVIADA"];
-
-async function loadQuotationForEmail(id: string) {
-  const quotation = await prisma.quotation.findUnique({
-    where: { id },
-    include: { client: true, request: { select: { status: true, destinationCity: true, destinationCountry: true } } },
-  });
-  if (!quotation) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
-  return quotation;
-}
 
 /** Texto inicial del correo y a quién se le puede enviar; la persona lo revisa y edita antes de enviar. */
 export async function getQuotationEmailDraft(req: Request, res: Response): Promise<void> {
   const quotation = await loadQuotationForEmail(req.params.id as string);
   const agency = await getAgencyForEmail();
   const { client } = quotation;
+  const sender = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true } });
+  const messages = {
+    both: buildDefaultMessage(quotation, client, agency, "both"),
+    link: buildDefaultMessage(quotation, client, agency, "link"),
+    pdf: buildDefaultMessage(quotation, client, agency, "pdf"),
+  };
   sendItem(res, {
     recipients: { primary: client.email ?? null, additional: client.additionalEmails ?? [] },
     subject: await buildDefaultSubject(quotation, client, agency),
-    message: buildDefaultMessage(quotation, client, agency),
+    message: messages.both,
+    // Según se envíe el enlace, el PDF o ambos, el texto sugerido cambia.
+    messages,
     attachmentName: `${quotation.quotationNumber}.pdf`,
+    // Las respuestas del cliente llegan a quien envía.
+    replyTo: sender?.email ?? null,
     // Para avisar antes de enviar: "off" no envía nada y "redirect" desvía todo a una casilla de pruebas.
     deliveryMode: env.EMAIL_DELIVERY,
     status: quotation.status,
@@ -361,78 +383,106 @@ export async function getQuotationEmailDraft(req: Request, res: Response): Promi
 }
 
 /**
- * Envía la cotización (con el PDF adjunto) al correo que la persona indicó, con el asunto y mensaje que editó.
- * Si estaba en Borrador pasa a Enviada; si ya estaba Enviada es un reenvío y el estado no cambia.
- * Solo se cambia el estado si el correo realmente salió: nunca queda "Enviada" una cotización que no se envió.
+ * Envía la cotización (enlace en línea y/o PDF adjunto) con el asunto y mensaje que la persona editó,
+ * o la deja programada para una fecha futura. Ver `sendQuotationNow` para las reglas del envío.
  */
 export async function sendQuotationByEmail(req: Request, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const { to, subject, message } = req.body as SendQuotationEmailInput;
-  const existing = await loadQuotationForEmail(id);
+  const { scheduledAt, ...options } = req.body as SendQuotationEmailInput;
 
-  if (!SENDABLE_STATUSES.includes(existing.status)) {
-    throw new ApiError(`Una cotización en estado ${existing.status} no se puede enviar`, 409, "QUOTATION_NOT_SENDABLE");
-  }
-  if (existing.request?.status === "CANCELADA") {
-    throw new ApiError("La solicitud está cancelada: no se puede enviar la cotización", 409, "REQUEST_CANCELLED");
-  }
-  if (env.BLOCK_EXPIRED_QUOTATIONS && isExpired(existing.validUntil)) {
-    throw new ApiError(
-      `La cotización venció el ${existing.validUntil}. Actualiza la fecha de validez antes de enviarla.`,
-      409,
-      "QUOTATION_EXPIRED"
-    );
-  }
-
-  // Sin PDF no se envía: la persona espera que el cliente reciba la cotización, no solo un mensaje.
-  let pdf: Buffer;
-  try {
-    pdf = await generateQuotationPdfBuffer({ ...existing, client: existing.client });
-  } catch (e) {
-    logger.error({ err: e, quotationId: id }, "No se pudo generar el PDF para enviar la cotización");
-    throw new ApiError("No se pudo generar el PDF de la cotización. No se envió nada.", 500, "PDF_FAILED");
-  }
-
-  const agency = await getAgencyForEmail();
-  let result;
-  try {
-    result = await sendEmail({
-      to,
-      subject,
-      html: buildQuotationMessageEmail(message, existing, agency),
-      attachments: [{ filename: `${existing.quotationNumber}.pdf`, content: pdf, contentType: "application/pdf" }],
+  if (scheduledAt) {
+    // Se valida ahora para no aceptar un envío que ya se sabe que fallará; al llegar la hora se vuelve a validar.
+    assertQuotationSendable(await loadQuotationForEmail(id));
+    const quotation = await prisma.quotation.findUniqueOrThrow({ where: { id } });
+    const scheduled = await prisma.scheduledQuotationSend.create({
+      data: { quotationId: id, payload: options, sendAt: new Date(scheduledAt), createdBy: req.user!.id },
     });
-  } catch (e) {
-    logger.error({ err: e, quotationId: id }, "Error enviando la cotización por correo");
-    throw new ApiError("No se pudo enviar el correo. Revisa la configuración del correo (SMTP) e inténtalo de nuevo.", 502, "EMAIL_SEND_FAILED");
-  }
-  if (!result.sent) {
-    throw new ApiError(
-      result.reason === "delivery-off"
-        ? "El envío de correos está desactivado en este entorno: no se envió nada."
-        : "El correo (SMTP) no está configurado: ve a Configuración > Email. No se envió nada.",
-      409,
-      "EMAIL_NOT_SENT"
-    );
+    await createActivityLog({
+      action: "UPDATE", entityType: "Quotation", entityId: id, entityLabel: quotation.quotationNumber,
+      description: `Envío por correo programado para el ${new Date(scheduledAt).toISOString()}`, performedBy: req.user!.id,
+    });
+    sendItem(res, { quotation, sent: false, scheduled: true, scheduledSendId: scheduled.id, sendAt: scheduled.sendAt, recipients: options.to.length, statusChanged: false });
+    return;
   }
 
-  // El correo ya salió: ahora sí se pasa a Enviada (cambio atómico, como en changeQuotationStatus).
-  let statusChanged = false;
-  if (existing.status === "BORRADOR") {
-    const swapped = await prisma.quotation.updateMany({ where: { id, status: "BORRADOR" }, data: { status: "ENVIADA" } });
-    statusChanged = swapped.count > 0;
-    if (statusChanged) await advanceWorkflowStatus(existing.requestId, existing.serviceId, "ENVIADO_AL_CLIENTE");
-  }
-
-  await createActivityLog({
-    action: "UPDATE",
-    entityType: "Quotation",
-    entityId: id,
-    entityLabel: existing.quotationNumber,
-    description: `${statusChanged ? "Enviada por correo (Borrador -> Enviada)" : "Reenviada por correo"} a ${to.map(maskEmail).join(", ")}`,
-    performedBy: req.user!.id,
-  });
-
+  const result = await sendQuotationNow(id, options, req.user!.id);
   const quotation = await prisma.quotation.findUniqueOrThrow({ where: { id } });
-  sendItem(res, { quotation, sent: true, recipients: to.length, statusChanged });
+  sendItem(res, { quotation, sent: true, scheduled: false, recipients: result.recipients, statusChanged: result.statusChanged, linkUrl: result.linkUrl });
+}
+
+export async function listScheduledSends(req: Request, res: Response): Promise<void> {
+  const items = await prisma.scheduledQuotationSend.findMany({
+    where: { quotationId: req.params.id as string, status: { in: ["PENDIENTE", "PROCESANDO", "FALLIDO"] } },
+    orderBy: { sendAt: "asc" },
+    select: { id: true, sendAt: true, status: true, attempts: true, lastError: true, payload: true },
+  });
+  sendItem(res, items);
+}
+
+export async function cancelScheduledSend(req: Request, res: Response): Promise<void> {
+  const swapped = await prisma.scheduledQuotationSend.updateMany({
+    where: { id: req.params.sendId as string, quotationId: req.params.id as string, status: { in: ["PENDIENTE", "FALLIDO"] } },
+    data: { status: "CANCELADO" },
+  });
+  if (swapped.count === 0) throw new ApiError("El envío ya salió o no existe", 409, "SCHEDULED_SEND_NOT_CANCELLABLE");
+  sendItem(res, { ok: true });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  ENLACE EN LÍNEA: seguimiento para el agente
+// ─────────────────────────────────────────────────────────────────────
+
+async function linkView(quotationId: string) {
+  const link = await findActiveLink(quotationId);
+  if (!link) return null;
+  const events = await prisma.quotationLinkEvent.findMany({
+    where: { linkId: link.id }, orderBy: { createdAt: "desc" }, take: 30,
+    select: { id: true, type: true, device: true, contactName: true, message: true, createdAt: true },
+  });
+  return {
+    url: buildLinkUrl(link.id),
+    createdAt: link.createdAt, expiresAt: link.expiresAt,
+    firstViewedAt: link.firstViewedAt, lastViewedAt: link.lastViewedAt, viewCount: link.viewCount,
+    acceptanceRequestedAt: link.acceptanceRequestedAt,
+    events,
+  };
+}
+
+export async function getQuotationLink(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const exists = await prisma.quotation.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
+  sendItem(res, { link: await linkView(id) });
+}
+
+/** Crea (o devuelve) el enlace para copiarlo y mandarlo por otro medio, p. ej. WhatsApp. Solo para cotizaciones Enviadas. */
+export async function ensureQuotationLink(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const quotation = await prisma.quotation.findUnique({ where: { id } });
+  if (!quotation) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
+  if (quotation.status !== "ENVIADA") {
+    throw new ApiError("El enlace se puede copiar cuando la cotización está Enviada. Envíala por correo o márcala como Enviada.", 409, "QUOTATION_NOT_SENT");
+  }
+  await getOrCreateActiveLink(id, quotation.validUntil, req.user!.id);
+  sendItem(res, { link: await linkView(id) });
+}
+
+/** Anula el enlace anterior (deja de funcionar) y crea uno nuevo: sirve si se envió a la persona equivocada. */
+export async function regenerateQuotationLink(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const quotation = await prisma.quotation.findUnique({ where: { id } });
+  if (!quotation) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
+  if (quotation.status !== "ENVIADA") throw new ApiError("Solo una cotización Enviada tiene enlace", 409, "QUOTATION_NOT_SENT");
+  await regenerateLink(id, quotation.validUntil, req.user!.id);
+  await createActivityLog({ action: "UPDATE", entityType: "Quotation", entityId: id, entityLabel: quotation.quotationNumber, description: "Enlace en línea regenerado (el anterior dejó de funcionar)", performedBy: req.user!.id });
+  sendItem(res, { link: await linkView(id) });
+}
+
+export async function revokeQuotationLink(req: Request, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const quotation = await prisma.quotation.findUnique({ where: { id } });
+  if (!quotation) throw new ApiError("Cotización no encontrada", 404, "QUOTATION_NOT_FOUND");
+  const revoked = await revokeLinks(id);
+  if (revoked > 0) await createActivityLog({ action: "UPDATE", entityType: "Quotation", entityId: id, entityLabel: quotation.quotationNumber, description: "Enlace en línea revocado", performedBy: req.user!.id });
+  sendItem(res, { revoked });
 }
